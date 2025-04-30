@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, createContext } from 'react';
 import MainSidebar from '../components/MainSidebar';
 import AppHeader from '../components/AppHeader';
 import UploadScriptTab from '../components/TabContent/UploadScriptTab';
@@ -10,9 +10,46 @@ import ScheduleTab from '../components/TabContent/ScheduleTab';
 import BudgetTab from '../components/TabContent/BudgetTab';
 import StoryboardTab from '../components/TabContent/StoryboardTab';
 import ProjectOverviewTab from '../components/TabContent/ProjectOverviewTab';
+import { ScriptData, OneLinerData, CharacterData, ScheduleData, StoryboardData } from '@/services/scriptApiService';
+
+// Create context for script data
+export interface ScriptDataContextType {
+  activeTab: number;
+  setActiveTab: (tab: number) => void;
+  scriptData: ScriptData | null;
+  oneLinerData: OneLinerData | null;
+  characterData: CharacterData | null;
+  scheduleData: ScheduleData | null;
+  storyboardData: StoryboardData | null;
+  updateScriptData: (data: ScriptData | null) => void;
+  updateOneLinerData: (data: OneLinerData | null) => void;
+  updateCharacterData: (data: CharacterData | null) => void;
+  updateScheduleData: (data: ScheduleData | null) => void;
+  updateStoryboardData: (data: StoryboardData | null) => void;
+}
+
+export const ScriptDataContext = createContext<ScriptDataContextType>({
+  activeTab: 0,
+  setActiveTab: () => {},
+  scriptData: null,
+  oneLinerData: null,
+  characterData: null,
+  scheduleData: null,
+  storyboardData: null,
+  updateScriptData: () => {},
+  updateOneLinerData: () => {},
+  updateCharacterData: () => {},
+  updateScheduleData: () => {},
+  updateStoryboardData: () => {},
+});
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState(0);
+  const [scriptData, setScriptData] = useState<ScriptData | null>(null);
+  const [oneLinerData, setOneLinerData] = useState<OneLinerData | null>(null);
+  const [characterData, setCharacterData] = useState<CharacterData | null>(null);
+  const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
+  const [storyboardData, setStoryboardData] = useState<StoryboardData | null>(null);
 
   // Mapping of tab indices to their components
   const tabComponents = [
@@ -26,21 +63,39 @@ const Index = () => {
     <ProjectOverviewTab key={7} />,
   ];
 
+  // Context value
+  const contextValue: ScriptDataContextType = {
+    activeTab,
+    setActiveTab,
+    scriptData,
+    oneLinerData,
+    characterData,
+    scheduleData,
+    storyboardData,
+    updateScriptData: setScriptData,
+    updateOneLinerData: setOneLinerData,
+    updateCharacterData: setCharacterData,
+    updateScheduleData: setScheduleData,
+    updateStoryboardData: setStoryboardData,
+  };
+
   return (
-    <div className="h-screen flex flex-col">
-      <AppHeader />
-      
-      <div className="flex-1 flex overflow-hidden">
-        <MainSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <ScriptDataContext.Provider value={contextValue}>
+      <div className="h-screen flex flex-col">
+        <AppHeader />
         
-        <main className="flex-1 overflow-hidden">
-          {/* Display the active tab content */}
-          <div className="h-full">
-            {tabComponents[activeTab]}
-          </div>
-        </main>
+        <div className="flex-1 flex overflow-hidden">
+          <MainSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <main className="flex-1 overflow-hidden">
+            {/* Display the active tab content */}
+            <div className="h-full">
+              {tabComponents[activeTab]}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </ScriptDataContext.Provider>
   );
 };
 

@@ -2,12 +2,12 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Settings, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { uploadScriptFile, analyzeScriptText } from '@/services/scriptApiService';
 
 const UploadScriptTab: React.FC = () => {
   const [uploadMode, setUploadMode] = useState<'file' | 'text'>('file');
   const [scriptText, setScriptText] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [validationLevel, setValidationLevel] = useState('lenient');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -21,31 +21,19 @@ const UploadScriptTab: React.FC = () => {
     setIsLoading(true);
     try {
       if (uploadMode === 'file' && file) {
-        // Handle file upload
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('validation_level', validationLevel);
+        // Handle file upload with new API
+        const result = await uploadScriptFile(file);
         
-        toast.promise(
-          // Simulating API call
-          new Promise(resolve => setTimeout(resolve, 2000)),
-          {
-            loading: 'Uploading and processing script...',
-            success: 'Script uploaded and processed successfully!',
-            error: 'Failed to upload script. Please try again.',
-          }
-        );
+        if (result) {
+          toast.success('Script uploaded and processed successfully!');
+        }
       } else if (uploadMode === 'text' && scriptText) {
-        // Handle text input
-        toast.promise(
-          // Simulating API call
-          new Promise(resolve => setTimeout(resolve, 2000)),
-          {
-            loading: 'Processing script text...',
-            success: 'Script text processed successfully!',
-            error: 'Failed to process script. Please try again.',
-          }
-        );
+        // Handle text input with new API
+        const result = await analyzeScriptText(scriptText);
+        
+        if (result) {
+          toast.success('Script text processed successfully!');
+        }
       } else {
         toast.error('Please provide a script file or text before submitting.');
       }
@@ -130,30 +118,16 @@ const UploadScriptTab: React.FC = () => {
           <div className="mt-8">
             <h3 className="text-lg font-medium mb-4 flex items-center">
               <Settings className="h-5 w-5 mr-2" />
-              Script Processing Settings
+              API Connection
             </h3>
             
             <div className="bg-studio-dark-blue p-4 rounded-md border border-studio-border">
-              <div className="mb-4">
-                <label className="block mb-2 text-studio-text-secondary">
-                  Validation Level
-                </label>
-                <select
-                  className="bg-studio-blue border border-studio-border rounded-md px-3 py-2 w-full"
-                  value={validationLevel}
-                  onChange={(e) => setValidationLevel(e.target.value)}
-                >
-                  <option value="lenient">Lenient (Format guessing)</option>
-                  <option value="standard">Standard (Basic checks)</option>
-                  <option value="strict">Strict (Industry standard)</option>
-                </select>
-              </div>
-              
               <div className="flex items-start space-x-2 text-sm text-studio-text-secondary bg-studio-accent/10 p-3 rounded-md">
                 <AlertCircle className="h-4 w-4 text-studio-accent flex-shrink-0 mt-0.5" />
                 <p>
-                  Higher validation levels may reject scripts with formatting issues, 
-                  but provide more accurate analysis. Use 'lenient' for draft scripts.
+                  Connected to API: https://varun324242-sjuu.hf.space
+                  <br />
+                  All data will be stored locally in your browser for persistence between sessions.
                 </p>
               </div>
             </div>
