@@ -2,7 +2,6 @@
 import React from 'react';
 import { Bell, Search, Settings, User } from 'lucide-react';
 import { Input } from './ui/input';
-import logo from '/lovable-uploads/e4c7fb38-b48e-403a-b36c-ac641d45f51e.png';
 
 const AppHeader: React.FC = () => {
   return (
@@ -11,7 +10,7 @@ const AppHeader: React.FC = () => {
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 flex items-center justify-center rounded-full bg-purple-600 relative">
             <img 
-              src={logo} 
+              src="https://api.iconify.design/bx:film.svg?color=white"
               alt="Film Production AI Assistant" 
               className="w-6 h-6 object-contain" 
               onError={(e) => {

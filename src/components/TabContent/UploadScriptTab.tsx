@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Upload, FileText, Settings, AlertCircle, Info } from 'lucide-react';
+import { Upload, FileText, Settings, AlertCircle, Info, Calendar, BarChart2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadScriptFile, analyzeScriptText } from '@/services/scriptApiService';
 import { useScriptData } from '@/hooks/useScriptData';
