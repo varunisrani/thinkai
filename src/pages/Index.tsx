@@ -1,4 +1,3 @@
-
 import React, { useState, createContext, useEffect } from 'react';
 import MainSidebar from '../components/MainSidebar';
 import AppHeader from '../components/AppHeader';
@@ -11,7 +10,7 @@ import BudgetTab from '../components/TabContent/BudgetTab';
 import StoryboardTab from '../components/TabContent/StoryboardTab';
 import ProjectOverviewTab from '../components/TabContent/ProjectOverviewTab';
 import { getStoredScriptData, getStoredOneLinerData, getStoredCharacterData, getStoredScheduleData, getStoredStoryboardData } from '@/services/storageService';
-import { ScriptData, OneLinerData, CharacterData, ScheduleData, StoryboardData } from '@/services/scriptApiService';
+import { ScriptData, OneLinerData, CharacterData, ScheduleData, StoryboardData, BudgetData } from '@/services/scriptApiService';
 
 // Create context for script data
 export interface ScriptDataContextType {
@@ -22,11 +21,14 @@ export interface ScriptDataContextType {
   characterData: CharacterData | null;
   scheduleData: ScheduleData | null;
   storyboardData: StoryboardData | null;
+  budgetData: BudgetData | null;
   updateScriptData: (data: ScriptData | null) => void;
   updateOneLinerData: (data: OneLinerData | null) => void;
   updateCharacterData: (data: CharacterData | null) => void;
   updateScheduleData: (data: ScheduleData | null) => void;
   updateStoryboardData: (data: StoryboardData | null) => void;
+  updateBudgetData: (data: BudgetData | null) => void;
+  canProceedToTab: (tabIndex: number) => boolean;
 }
 
 export const ScriptDataContext = createContext<ScriptDataContextType>({
@@ -37,11 +39,14 @@ export const ScriptDataContext = createContext<ScriptDataContextType>({
   characterData: null,
   scheduleData: null,
   storyboardData: null,
+  budgetData: null,
   updateScriptData: () => {},
   updateOneLinerData: () => {},
   updateCharacterData: () => {},
   updateScheduleData: () => {},
   updateStoryboardData: () => {},
+  updateBudgetData: () => {},
+  canProceedToTab: () => true,
 });
 
 const Index = () => {
@@ -60,8 +65,8 @@ const Index = () => {
     <OneLinerTab key={2} />,
     <CharacterBreakdownTab key={3} />,
     <ScheduleTab key={4} />,
-    <BudgetTab key={5} />,
-    <StoryboardTab key={6} />,
+    <BudgetTab key={5} darkMode={false} apiUrl="/api/budget" />,
+    <StoryboardTab key={6} darkMode={false} apiUrl="/api/storyboard" />,
     <ProjectOverviewTab key={7} />,
   ];
 
@@ -74,11 +79,40 @@ const Index = () => {
     characterData,
     scheduleData,
     storyboardData,
+    budgetData: null,
     updateScriptData: setScriptData,
     updateOneLinerData: setOneLinerData,
     updateCharacterData: setCharacterData,
     updateScheduleData: setScheduleData,
     updateStoryboardData: setStoryboardData,
+    updateBudgetData: () => {},
+    canProceedToTab: (tabIndex: number) => {
+      // Tab 0 (Upload) is always accessible
+      if (tabIndex === 0) return true;
+      
+      // Script Analysis (1) requires script data
+      if (tabIndex === 1) return !!scriptData;
+      
+      // One-liner (2) requires script data
+      if (tabIndex === 2) return !!scriptData;
+      
+      // Character Breakdown (3) requires script data and one-liner
+      if (tabIndex === 3) return !!scriptData && !!oneLinerData;
+      
+      // Schedule (4) requires character data
+      if (tabIndex === 4) return !!scriptData && !!characterData;
+      
+      // Budget (5) requires schedule
+      if (tabIndex === 5) return !!scriptData && !!scheduleData;
+      
+      // Storyboard (6) requires script data
+      if (tabIndex === 6) return !!scriptData;
+      
+      // Project Overview (7) requires script data
+      if (tabIndex === 7) return !!scriptData;
+      
+      return false;
+    }
   };
 
   return (

@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import {
   ScriptData,
@@ -10,11 +9,11 @@ import {
 
 // Local storage keys
 export const STORAGE_KEYS = {
-  SCRIPT_DATA: 'script_data',
-  ONE_LINER_DATA: 'one_liner_data',
-  CHARACTER_DATA: 'character_data',
-  SCHEDULE_DATA: 'schedule_data',
-  STORYBOARD_DATA: 'storyboard_data',
+  SCRIPT_DATA: 'SCRIPT_DATA',
+  ONE_LINER_DATA: 'ONE_LINER_DATA',
+  CHARACTER_DATA: 'CHARACTER_DATA',
+  SCHEDULE_DATA: 'SCHEDULE_DATA',
+  STORYBOARD_DATA: 'STORYBOARD_DATA',
 };
 
 // Save data to local storage

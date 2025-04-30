@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Bell, Search, Settings, User } from 'lucide-react';
 import { Input } from './ui/input';
@@ -11,7 +10,7 @@ const AppHeader: React.FC = () => {
           <div className="w-8 h-8 flex items-center justify-center rounded-full bg-purple-600 relative">
             <img 
               src="https://api.iconify.design/bx:film.svg?color=white"
-              alt="Film Production AI Assistant" 
+              alt="Think AI" 
               className="w-6 h-6 object-contain" 
               onError={(e) => {
                 e.currentTarget.src = "https://api.iconify.design/bx:film.svg?color=white";
@@ -19,7 +18,7 @@ const AppHeader: React.FC = () => {
             />
           </div>
           <h1 className="text-xl font-semibold text-studio-text-primary">
-            Film Production AI Assistant
+            Think AI
           </h1>
         </div>
         <div className="ml-6 text-sm px-3 py-1 rounded-full bg-purple-50 text-purple-600 border border-purple-100">

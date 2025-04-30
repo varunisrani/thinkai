@@ -65,6 +65,19 @@ export interface ScriptData {
       };
     };
   };
+  characters: {
+    [key: string]: {
+      name: string;
+      description: string;
+      traits: string[];
+      relationships: Array<{
+        character: string;
+        relationship_type: string;
+        intensity: number;
+      }>;
+    };
+  };
+  [key: string]: unknown;
 }
 
 export interface OneLinerData {
@@ -74,6 +87,7 @@ export interface OneLinerData {
     one_liner: string;
   }>;
   overall_summary: string;
+  [key: string]: unknown;
 }
 
 export interface CharacterData {
@@ -159,6 +173,7 @@ export interface CharacterData {
       }>;
     };
   };
+  [key: string]: unknown;
 }
 
 export interface ScheduleData {
@@ -259,9 +274,12 @@ export interface ScheduleData {
     total_runtime_minutes: number;
   };
   optimization_notes: string[];
+  [key: string]: unknown;
 }
 
 export interface StoryboardData {
+  id?: string;
+  script_id?: string;
   scenes: Array<{
     scene_id: string;
     description: string;
@@ -275,6 +293,105 @@ export interface StoryboardData {
       mood: string;
     };
   }>;
+  settings?: {
+    shot_settings: {
+      default_shot_type: string;
+      style: string;
+      mood: string;
+      camera_angle: string;
+      scene_settings: Record<string, unknown>;
+    };
+    layout: {
+      panels_per_row: number;
+      panel_size: string;
+      show_captions: boolean;
+      show_technical: boolean;
+    };
+    image: {
+      quality: string;
+      aspect_ratio: string;
+      color_mode: string;
+      border: string;
+    };
+  };
+}
+
+export interface BudgetData {
+  total_budget: number;
+  categories: Array<{
+    id: string;
+    name: string;
+    amount: number;
+    percentage: number;
+    items: Array<{
+      name: string;
+      amount: number;
+    }>;
+  }>;
+  location_costs: {
+    [key: string]: {
+      daily_rate?: number;
+      permit_costs?: number;
+      additional_fees?: string[];
+      total_days?: number;
+      total_cost: number;
+    }
+  };
+  equipment_costs: {
+    [key: string]: {
+      items?: string[];
+      rental_rates?: { [key: string]: number };
+      insurance_costs?: number;
+      total_cost: number;
+    }
+  };
+  personnel_costs: {
+    [key: string]: {
+      daily_rate?: number;
+      overtime_rate?: number;
+      benefits?: number;
+      total_days?: number;
+      total_cost: number;
+    }
+  };
+  logistics_costs: {
+    transportation: { rental_vehicle: number };
+    accommodation: { hotel: number };
+    catering: { meal_service: number };
+    misc_expenses: string[];
+  };
+  insurance_costs: { type: number };
+  contingency: {
+    amount: number;
+    percentage: number;
+  };
+  total_estimates: {
+    total_location_costs: number;
+    total_equipment_costs: number;
+    total_personnel_costs: number;
+    total_logistics_costs: number;
+    total_insurance_costs: number;
+    contingency_amount: number;
+    grand_total: number;
+  };
+  summary: {
+    total_days: number;
+    total_locations: number;
+    total_crew: number;
+    cost_per_day: number;
+  };
+  scenario_results?: {
+    cost_savings: number;
+    quality_impact: number;
+    recommendations: Array<{
+      category: string;
+      action: string;
+      impact: {
+        cost: number;
+        quality: number;
+      };
+    }>;
+  };
 }
 
 // Common fetch wrapper with error handling
@@ -298,27 +415,67 @@ async function fetchFromAPI<T>(
     
     const data = await response.json();
     
-    // Check for the API response structure
+    // Enhanced response handling
     if (data && typeof data === 'object') {
-      // If response has success field (matches ApiResponse model in API.py)
+      // If response has success field
       if ('success' in data) {
         if (!data.success) {
           throw new Error(data.error || 'API returned error status');
         }
-        // Return the data field if it exists, otherwise the whole response
-        return (data.data !== undefined) ? data.data as T : data as T;
+        // Return the data field if it exists
+        const resultData = data.data !== undefined ? data.data : data;
+        
+        // Save to localStorage based on endpoint
+        if (endpoint.includes('/script')) {
+          saveToLocalStorage(STORAGE_KEYS.SCRIPT_DATA, resultData);
+        } else if (endpoint.includes('/one-liner')) {
+          saveToLocalStorage(STORAGE_KEYS.ONE_LINER_DATA, resultData);
+        } else if (endpoint.includes('/characters')) {
+          saveToLocalStorage(STORAGE_KEYS.CHARACTER_DATA, resultData);
+        } else if (endpoint.includes('/schedule')) {
+          saveToLocalStorage(STORAGE_KEYS.SCHEDULE_DATA, resultData);
+        } else if (endpoint.includes('/storyboard')) {
+          saveToLocalStorage(STORAGE_KEYS.STORYBOARD_DATA, resultData);
+        }
+        
+        return resultData as T;
       }
       
-      // Otherwise return the whole response
+      // If no success field, treat as direct data
       return data as T;
     }
     
     return data as T;
   } catch (error) {
     console.error(`API Error (${endpoint}):`, error);
+    // Try to load from localStorage as fallback
+    const storageKey = getStorageKeyFromEndpoint(endpoint);
+    if (storageKey) {
+      const cachedData = getFromLocalStorage<T>(storageKey);
+      if (cachedData) {
+        console.log(`Loaded cached data for ${endpoint}`);
+        return cachedData;
+      }
+    }
     toast.error(`API Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
+}
+
+// Helper to get storage key from endpoint
+function getStorageKeyFromEndpoint(endpoint: string): string | null {
+  if (endpoint.includes('/script')) {
+    return STORAGE_KEYS.SCRIPT_DATA;
+  } else if (endpoint.includes('/one-liner')) {
+    return STORAGE_KEYS.ONE_LINER_DATA;
+  } else if (endpoint.includes('/characters')) {
+    return STORAGE_KEYS.CHARACTER_DATA;
+  } else if (endpoint.includes('/schedule')) {
+    return STORAGE_KEYS.SCHEDULE_DATA;
+  } else if (endpoint.includes('/storyboard')) {
+    return STORAGE_KEYS.STORYBOARD_DATA;
+  }
+  return null;
 }
 
 // Script processing APIs
@@ -509,7 +666,7 @@ export async function generateStoryboard(
       camera_angle: cameraAngle
     };
 
-    const responseData = await fetchFromAPI<{success: boolean, data: any, error?: string}>('/api/storyboard', {
+    const responseData = await fetchFromAPI<{success: boolean, data: StoryboardData, error?: string}>('/api/storyboard', {
       method: 'POST',
       body: JSON.stringify(requestData),
     });
@@ -533,12 +690,15 @@ export async function generateStoryboard(
         // Update existing scene
         if ('scenes' in singleSceneData && Array.isArray(singleSceneData.scenes)) {
           // If response has scenes array, use the first item
-          existingData.scenes[sceneIndex] = singleSceneData.scenes[0];
+          const sceneData = ('data' in singleSceneData ? singleSceneData.data : singleSceneData) as StoryboardData['scenes'][0];
+          existingData.scenes[sceneIndex] = sceneData;
+          updatedData = existingData;
         } else {
           // If response is just the scene data
-          existingData.scenes[sceneIndex] = singleSceneData;
+          const sceneData = ('data' in singleSceneData ? singleSceneData.data.scenes[0] : singleSceneData) as StoryboardData['scenes'][0];
+          existingData.scenes[sceneIndex] = sceneData;
+          updatedData = existingData;
         }
-        updatedData = existingData;
       } else {
         // Add new scene
         if ('scenes' in singleSceneData && Array.isArray(singleSceneData.scenes)) {
@@ -548,8 +708,9 @@ export async function generateStoryboard(
           };
         } else {
           // If response is just the scene data
+          const sceneData = ('data' in singleSceneData ? singleSceneData.data.scenes[0] : singleSceneData) as StoryboardData['scenes'][0];
           updatedData = {
-            scenes: [...existingData.scenes, singleSceneData]
+            scenes: [...existingData.scenes, sceneData]
           };
         }
       }
@@ -560,8 +721,9 @@ export async function generateStoryboard(
         updatedData = singleSceneData;
       } else {
         // If response is just the scene data
+        const sceneData = ('data' in singleSceneData ? singleSceneData.data.scenes[0] : singleSceneData) as StoryboardData['scenes'][0];
         updatedData = {
-          scenes: [singleSceneData]
+          scenes: [sceneData]
         };
       }
     }
@@ -620,36 +782,93 @@ export async function generateStoryboardBatch(): Promise<StoryboardData | null> 
   }
 }
 
-// Utility functions to get data from storage service
+// Enhanced data loading functions
 export function getScriptData(): ScriptData | null {
-  return getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
+  const data = getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
+  if (!data) {
+    console.log('No script data found in storage');
+    return null;
+  }
+  return data;
 }
 
 export function getOneLinerData(): OneLinerData | null {
-  return getFromLocalStorage<OneLinerData>(STORAGE_KEYS.ONE_LINER_DATA);
+  const data = getFromLocalStorage<OneLinerData>(STORAGE_KEYS.ONE_LINER_DATA);
+  if (!data) {
+    console.log('No one-liner data found in storage');
+    return null;
+  }
+  return data;
 }
 
 export function getCharacterData(): CharacterData | null {
-  return getFromLocalStorage<CharacterData>(STORAGE_KEYS.CHARACTER_DATA);
+  const data = getFromLocalStorage<CharacterData>(STORAGE_KEYS.CHARACTER_DATA);
+  if (!data) {
+    console.log('No character data found in storage');
+    return null;
+  }
+  return data;
 }
 
 export function getScheduleData(): ScheduleData | null {
-  return getFromLocalStorage<ScheduleData>(STORAGE_KEYS.SCHEDULE_DATA);
+  const data = getFromLocalStorage<ScheduleData>(STORAGE_KEYS.SCHEDULE_DATA);
+  if (!data) {
+    console.log('No schedule data found in storage');
+    return null;
+  }
+  return data;
 }
 
 export function getStoryboardData(): StoryboardData | null {
-  return getFromLocalStorage<StoryboardData>(STORAGE_KEYS.STORYBOARD_DATA);
+  const data = getFromLocalStorage<StoryboardData>(STORAGE_KEYS.STORYBOARD_DATA);
+  if (!data) {
+    console.log('No storyboard data found in storage');
+    return null;
+  }
+  return data;
 }
 
-// Function to clear all data
+// Enhanced clear data function
 export function clearAllData(): void {
-  [
-    STORAGE_KEYS.SCRIPT_DATA,
-    STORAGE_KEYS.ONE_LINER_DATA,
-    STORAGE_KEYS.CHARACTER_DATA,
-    STORAGE_KEYS.SCHEDULE_DATA,
-    STORAGE_KEYS.STORYBOARD_DATA
-  ].forEach(key => localStorage.removeItem(key));
-  
-  toast.success('All script data cleared successfully');
+  try {
+    [
+      STORAGE_KEYS.SCRIPT_DATA,
+      STORAGE_KEYS.ONE_LINER_DATA,
+      STORAGE_KEYS.CHARACTER_DATA,
+      STORAGE_KEYS.SCHEDULE_DATA,
+      STORAGE_KEYS.STORYBOARD_DATA
+    ].forEach(key => {
+      localStorage.removeItem(key);
+      console.log(`Cleared ${key} from storage`);
+    });
+    
+    // Also try to clear from API storage
+    fetch(`${API_BASE_URL}/storage`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    }).catch(err => console.warn('Failed to clear API storage:', err));
+    
+    toast.success('All script data cleared successfully');
+  } catch (error) {
+    console.error('Error clearing data:', error);
+    toast.error('Failed to clear some data');
+  }
+}
+
+// Add data validation function
+export function validateRequiredData(currentStep: string): boolean {
+  switch (currentStep) {
+    case 'one-liner':
+      return !!getScriptData();
+    case 'characters':
+      return !!getScriptData();
+    case 'schedule':
+      return !!getScriptData() && !!getCharacterData();
+    case 'budget':
+      return !!getScriptData() && !!getScheduleData();
+    case 'storyboard':
+      return !!getScriptData();
+    default:
+      return true;
+  }
 }

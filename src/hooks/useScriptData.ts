@@ -1,6 +1,5 @@
-
 import { useContext, useEffect } from 'react';
-import { ScriptDataContext } from '@/pages/Index';
+import { ScriptDataContext, ScriptDataContextType } from '@/pages/Index';
 import { 
   getFromLocalStorage,
   STORAGE_KEYS
@@ -14,7 +13,7 @@ import {
 } from '@/services/scriptApiService';
 
 // Custom hook to access the script data context
-export function useScriptData() {
+export function useScriptData(): ScriptDataContextType {
   const context = useContext(ScriptDataContext);
   if (context === undefined) {
     throw new Error('useScriptData must be used within a ScriptDataProvider');
