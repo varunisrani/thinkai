@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, List, MapPin, Users, Calendar as CalendarIcon, 
-  FileText, ChartGantt, FilePieChart, Database, ChevronLeft, ChevronRight
+  FileText, ChartGantt, FilePieChart, Database, ChevronLeft, ChevronRight,
+  Wrench, Clock, Briefcase
 } from 'lucide-react';
-import { Tool } from '@/lib/icon-exports';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useScriptData } from '@/hooks/useScriptData';
@@ -26,6 +26,32 @@ interface SubtabProps {
   onClick: () => void;
 }
 
+interface ScheduleParams {
+  script_results: {
+    validation: {
+      validation_report: {
+        technical_validation: {
+          department_conflicts: any[];
+        };
+      };
+    };
+    characters: Record<string, unknown>;
+  };
+  character_results: {
+    relationships: Record<string, unknown>;
+  };
+  start_date: string;
+  location_constraints: {
+    preferred_locations: string[];
+    avoid_weather: string[];
+  };
+  schedule_constraints: {
+    max_hours_per_day: number;
+    meal_break_duration: number;
+    company_moves_per_day: number;
+  };
+}
+
 // Define proper TypeScript interfaces for the data
 interface Scene {
   scene_id: string;
@@ -36,6 +62,11 @@ interface Scene {
   wrap_time: string;
   crew_ids?: string[];
   equipment_ids?: string[];
+  breaks?: Array<{
+    type: string;
+    start_time: string;
+    end_time: string;
+  }>;
 }
 
 interface ScheduleDay {
@@ -51,25 +82,82 @@ interface Location {
   scenes: string[];
   setup_time_minutes: number;
   wrap_time_minutes: number;
+  requirements: string[];
 }
 
 interface LocationPlan {
   locations: Location[];
+  location_groups: Array<{
+    group_id: string;
+    locations: string[];
+    reason: string;
+  }>;
+  weather_dependencies: Record<string, {
+    preferred_conditions: string[];
+    avoid_conditions: string[];
+    seasonal_notes: string[];
+  }>;
 }
 
-interface ScheduleParams {
-  script_results: ScriptData;
-  character_results: CharacterData;
+interface CrewMember {
+  crew_member: string;
+  role: string;
+  assigned_scenes: string[];
+  work_hours: number;
+  turnaround_hours: number;
+  meal_break_interval: number;
+  equipment_assigned: string[];
+}
+
+interface Equipment {
+  equipment_id: string;
+  type: string;
+  assigned_scenes: string[];
+  setup_time_minutes: number;
+  assigned_crew: string[];
+}
+
+interface CrewAllocation {
+  crew_assignments: CrewMember[];
+  equipment_assignments: Equipment[];
+  department_schedules: Record<string, {
+    crew: string[];
+    equipment: string[];
+    notes: string[];
+  }>;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  resourceId: string;
+  color: string;
+  textColor: string;
+  description: string;
+  location: string;
+  crew: string[];
+  equipment: string[];
+}
+
+interface GanttTask {
+  id: string;
+  text: string;
   start_date: string;
-  location_constraints: {
-    preferred_locations: string[];
-    avoid_weather: string[];
-  };
-  schedule_constraints: {
-    max_hours_per_day: number;
-    meal_break_duration: number;
-    company_moves_per_day: number;
-  };
+  end_date: string;
+  progress: number;
+  parent: string;
+  dependencies: string[];
+  resource_ids: string[];
+  type: string;
+  color: string;
+}
+
+interface TimelineEvent {
+  title: string;
+  time: string;
+  description: string;
 }
 
 const Subtab: React.FC<SubtabProps> = ({ active, icon: Icon, label, onClick }) => (
@@ -90,6 +178,16 @@ const ScheduleTab: React.FC = () => {
   const [activeSubtab, setActiveSubtab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Define all available subtabs
+  const subtabs = [
+    { icon: Calendar, label: "Calendar View" },
+    { icon: List, label: "Schedule List" },
+    { icon: MapPin, label: "Location Plan" },
+    { icon: Users, label: "Crew Allocation" },
+    { icon: Wrench, label: "Equipment" },
+    { icon: ChartGantt, label: "Gantt Chart" }
+  ];
 
   // Load data from localStorage on initial mount
   useEffect(() => {
@@ -287,203 +385,493 @@ const ScheduleTab: React.FC = () => {
     );
   }
 
+  const renderCalendarView = () => {
+    return (
+      <div className="animate-fade-in">
+        <div className="p-6">
+          <div className="mb-4 flex justify-between items-center">
+            <button 
+              onClick={handleGenerateSchedule}
+              disabled={loading}
+              className="px-4 py-2 bg-studio-accent text-white rounded-md hover:bg-studio-accent-dark disabled:opacity-50"
+            >
+              {loading ? 'Regenerating...' : 'Regenerate Schedule'}
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+
+          {scheduleData.schedule?.map((day, index) => (
+            <div key={index} className="mb-4">
+              <div className="studio-section">
+                <h3 className="text-xl font-medium mb-4">
+                  Day {index + 1} - {format(new Date(day.date), 'MMMM d, yyyy')}
+                </h3>
+
+                <div className="space-y-4">
+                  {day.scenes.map((scene, sceneIndex) => (
+                    <div 
+                      key={sceneIndex}
+                      className="p-4 bg-studio-blue/30 border border-studio-border rounded-lg"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center">
+                          <CalendarIcon className="h-4 w-4 mr-2 text-studio-accent" />
+                          <span className="font-medium">Scene {scene.scene_id}</span>
+                        </div>
+                        <span className="text-sm text-studio-text-secondary">
+                          {scene.start_time} - {scene.end_time}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-studio-text-secondary">Location:</p>
+                          <p>{scene.location_id}</p>
+                        </div>
+                        <div>
+                          <p className="text-studio-text-secondary">Duration:</p>
+                          <p>{scene.duration_minutes} minutes</p>
+                        </div>
+                        <div>
+                          <p className="text-studio-text-secondary">Equipment:</p>
+                          <p>{scene.equipment_ids.join(', ')}</p>
+                        </div>
+                      </div>
+
+                      {scene.crew_ids && scene.crew_ids.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-studio-text-secondary mb-1">Crew:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {scene.crew_ids.map((crew, i) => (
+                              <span 
+                                key={i}
+                                className="px-2 py-1 bg-studio-blue/20 rounded-md text-sm"
+                              >
+                                {crew}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {scene.breaks && scene.breaks.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-studio-text-secondary mb-1">Breaks:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {scene.breaks.map((breakItem, i) => (
+                              <span 
+                                key={i}
+                                className="px-2 py-1 bg-studio-blue/20 rounded-md text-sm"
+                              >
+                                {breakItem.type}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderScheduleList = () => {
+    return (
+      <div className="p-6 animate-fade-in">
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Schedule List</h3>
+          <div className="space-y-4">
+            {scheduleData.schedule?.map((day, index) => (
+              <div key={index} className="p-4 bg-studio-blue/40 border border-studio-border rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center">
+                    <CalendarIcon className="h-4 w-4 mr-2 text-studio-accent" />
+                    <span className="font-medium">Day {index + 1} ({format(new Date(day.date), 'MMMM d, yyyy')})</span>
+                  </div>
+                  <span className="text-sm text-studio-text-secondary">8:00 AM - 6:00 PM</span>
+                </div>
+                <div className="space-y-2">
+                  {day.scenes.map((scene, sceneIndex) => (
+                    <div key={sceneIndex} className="p-2 bg-studio-blue/30 rounded flex justify-between">
+                      <div>
+                        <span className="text-studio-accent">Scene {scene.scene_id}</span>
+                        <span className="mx-2 text-studio-text-secondary">|</span>
+                        <span>{scene.location_id}</span>
+                      </div>
+                      <span className="text-sm text-studio-text-secondary">
+                        {scene.start_time} - {scene.end_time}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLocationPlan = () => {
+    if (!scheduleData?.location_plan) return null;
+    
+    return (
+      <div className="p-6 space-y-6">
+        {/* Locations */}
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Locations</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {scheduleData.location_plan.locations.map((location) => (
+              <div key={location.id} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                <h4 className="font-medium mb-2">{location.name}</h4>
+                <div className="space-y-2 text-sm">
+                  <p><span className="text-studio-text-secondary">Address:</span> {location.address}</p>
+                  <p><span className="text-studio-text-secondary">Setup Time:</span> {location.setup_time_minutes} minutes</p>
+                  <p><span className="text-studio-text-secondary">Wrap Time:</span> {location.wrap_time_minutes} minutes</p>
+                  <div>
+                    <p className="text-studio-text-secondary mb-1">Requirements:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {location.requirements.map((req, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          {req}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Location Groups */}
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Location Groups</h3>
+          <div className="space-y-4">
+            {scheduleData.location_plan.location_groups.map((group) => (
+              <div key={group.group_id} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                <h4 className="font-medium mb-2">Group {group.group_id}</h4>
+                <p className="text-sm mb-2">{group.reason}</p>
+                <div className="flex flex-wrap gap-2">
+                  {group.locations.map((locId) => (
+                    <span key={locId} className="bg-studio-blue/30 px-2 py-1 rounded text-sm">
+                      {locId}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Weather Dependencies */}
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Weather Dependencies</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(scheduleData.location_plan.weather_dependencies).map(([locId, weather]) => (
+              <div key={locId} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                <h4 className="font-medium mb-2">Location {locId}</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Preferred Conditions:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {weather.preferred_conditions.map((condition, i) => (
+                        <span key={i} className="bg-studio-success/20 px-2 py-0.5 rounded text-xs">
+                          {condition}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Avoid Conditions:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {weather.avoid_conditions.map((condition, i) => (
+                        <span key={i} className="bg-studio-warning/20 px-2 py-0.5 rounded text-xs">
+                          {condition}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Seasonal Notes:</p>
+                    <ul className="list-disc list-inside text-xs">
+                      {weather.seasonal_notes.map((note, i) => (
+                        <li key={i}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCrewAllocation = () => {
+    if (!scheduleData?.crew_allocation) return null;
+
+    return (
+      <div className="p-6 space-y-6">
+        {/* Crew Assignments */}
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Crew Assignments</h3>
+          <div className="space-y-4">
+            {scheduleData.crew_allocation.crew_assignments.map((crew) => (
+              <div key={crew.crew_member} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 className="font-medium">{crew.crew_member}</h4>
+                    <p className="text-sm text-studio-text-secondary">{crew.role}</p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p>{crew.work_hours}hr shift</p>
+                    <p className="text-studio-text-secondary">{crew.turnaround_hours}hr turnaround</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Assigned Scenes:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {crew.assigned_scenes.map((scene, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          Scene {scene}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Equipment:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {crew.equipment_assigned.map((equipment, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          {equipment}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Department Schedules */}
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Department Schedules</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(scheduleData.crew_allocation.department_schedules).map(([dept, info]) => (
+              <div key={dept} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                <h4 className="font-medium mb-2">{dept}</h4>
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Crew:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {info.crew.map((member, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          {member}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Equipment:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {info.equipment.map((item, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {info.notes.length > 0 && (
+                    <div>
+                      <p className="text-sm text-studio-text-secondary mb-1">Notes:</p>
+                      <ul className="list-disc list-inside text-xs">
+                        {info.notes.map((note, i) => (
+                          <li key={i}>{note}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEquipment = () => {
+    if (!scheduleData?.crew_allocation?.equipment_assignments) return null;
+
+    return (
+      <div className="p-6">
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Equipment Assignments</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {scheduleData.crew_allocation.equipment_assignments.map((equipment) => (
+              <div key={equipment.equipment_id} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                <h4 className="font-medium mb-2">{equipment.equipment_id}</h4>
+                <div className="space-y-2">
+                  <p className="text-sm">
+                    <span className="text-studio-text-secondary">Type:</span> {equipment.type}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-studio-text-secondary">Setup Time:</span> {equipment.setup_time_minutes} minutes
+                  </p>
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Assigned Scenes:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {equipment.assigned_scenes.map((scene, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          Scene {scene}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-studio-text-secondary mb-1">Assigned Crew:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {equipment.assigned_crew.map((crew, i) => (
+                        <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                          {crew}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderGanttChart = () => {
+    if (!scheduleData?.gantt_data) return null;
+
+    return (
+      <div className="p-6">
+        <div className="studio-section">
+          <h3 className="text-xl font-medium mb-4">Production Timeline</h3>
+          <div className="space-y-4">
+            {scheduleData.gantt_data.tasks.map((task: GanttTask) => (
+              <div 
+                key={task.id} 
+                className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg"
+                style={{ borderLeft: `4px solid ${task.color}` }}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-medium">{task.text}</h4>
+                  <span className="text-sm text-studio-text-secondary">
+                    {format(new Date(task.start_date), 'MMM d, HH:mm')} - 
+                    {format(new Date(task.end_date), 'HH:mm')}
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  {task.parent && (
+                    <p><span className="text-studio-text-secondary">Parent Task:</span> {task.parent}</p>
+                  )}
+                  {task.dependencies.length > 0 && (
+                    <div>
+                      <p className="text-studio-text-secondary mb-1">Dependencies:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {task.dependencies.map((dep, i) => (
+                          <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                            {dep}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="w-full bg-studio-blue/30 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-studio-accent h-full rounded-full"
+                      style={{ width: `${task.progress * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="border-b border-studio-border p-4">
-        <h2 className="text-2xl font-semibold mb-4 text-studio-text-primary">
-          Production Schedule
-        </h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold text-studio-text-primary">
+            Production Schedule
+          </h2>
+          {scheduleData && (
+            <button 
+              onClick={handleGenerateSchedule}
+              disabled={loading}
+              className="px-4 py-2 bg-studio-accent text-white rounded-md hover:bg-studio-accent-dark disabled:opacity-50"
+            >
+              {loading ? 'Regenerating...' : 'Regenerate Schedule'}
+            </button>
+          )}
+        </div>
         
         <div className="flex overflow-x-auto pb-2">
-          <Subtab
-            active={activeSubtab === 0}
-            icon={Calendar}
-            label="Calendar View"
-            onClick={() => setActiveSubtab(0)}
-          />
-          <Subtab
-            active={activeSubtab === 1}
-            icon={List}
-            label="Schedule List"
-            onClick={() => setActiveSubtab(1)}
-          />
-          <Subtab
-            active={activeSubtab === 2}
-            icon={MapPin}
-            label="Location Plan"
-            onClick={() => setActiveSubtab(2)}
-          />
+          {subtabs.map((tab, index) => (
+            <Subtab
+              key={index}
+              active={activeSubtab === index}
+              icon={tab.icon}
+              label={tab.label}
+              onClick={() => setActiveSubtab(index)}
+            />
+          ))}
         </div>
       </div>
       
       <div className="flex-1 overflow-y-auto">
-        {/* Calendar View */}
-        {activeSubtab === 0 && (
-          <div className="animate-fade-in">
-            <div className="p-6">
-              <div className="mb-4 flex justify-between items-center">
-                <button 
-                  onClick={handleGenerateSchedule}
-                  disabled={loading}
-                  className="px-4 py-2 bg-studio-accent text-white rounded-md hover:bg-studio-accent-dark disabled:opacity-50"
-                >
-                  {loading ? 'Regenerating...' : 'Regenerate Schedule'}
-                </button>
-              </div>
-
+        {!scheduleData ? (
+          <div className="p-6">
+            <div className="text-center">
+              <h3 className="text-2xl font-semibold mb-6">Generate Production Schedule</h3>
               {error && (
                 <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
                   {error}
                 </div>
               )}
-
-              {scheduleData.schedule?.map((day, index) => (
-                <div key={index} className="mb-4">
-                  <div className="studio-section">
-                    <h3 className="text-xl font-medium mb-4">
-                      Day {index + 1} - {format(new Date(day.date), 'MMMM d, yyyy')}
-                    </h3>
-
-                    <div className="space-y-4">
-                      {day.scenes.map((scene, sceneIndex) => (
-                        <div 
-                          key={sceneIndex}
-                          className="p-4 bg-studio-blue/30 border border-studio-border rounded-lg"
-                        >
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center">
-                              <CalendarIcon className="h-4 w-4 mr-2 text-studio-accent" />
-                              <span className="font-medium">Scene {scene.scene_id}</span>
-                            </div>
-                            <span className="text-sm text-studio-text-secondary">
-                              {scene.start_time} - {scene.end_time}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <p className="text-studio-text-secondary">Location:</p>
-                              <p>{scene.location_id}</p>
-                            </div>
-                            <div>
-                              <p className="text-studio-text-secondary">Duration:</p>
-                              <p>{scene.duration_minutes} minutes</p>
-                            </div>
-                            <div>
-                              <p className="text-studio-text-secondary">Equipment:</p>
-                              <p>{scene.equipment_ids.join(', ')}</p>
-                            </div>
-                          </div>
-
-                          {scene.crew_ids && scene.crew_ids.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-studio-text-secondary mb-1">Crew:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {scene.crew_ids.map((crew, i) => (
-                                  <span 
-                                    key={i}
-                                    className="px-2 py-1 bg-studio-blue/20 rounded-md text-sm"
-                                  >
-                                    {crew}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {scene.breaks && scene.breaks.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-studio-text-secondary mb-1">Breaks:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {scene.breaks.map((breakItem, i) => (
-                                  <span 
-                                    key={i}
-                                    className="px-2 py-1 bg-studio-blue/20 rounded-md text-sm"
-                                  >
-                                    {breakItem.type}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
+              <button
+                onClick={handleGenerateSchedule}
+                disabled={loading}
+                className="w-full max-w-md py-3 bg-studio-accent text-white rounded-md hover:bg-studio-accent-dark font-medium disabled:opacity-50"
+              >
+                {loading ? 'Generating Schedule...' : 'Generate Schedule'}
+              </button>
             </div>
           </div>
-        )}
-        
-        {/* Schedule List */}
-        {activeSubtab === 1 && (
-          <div className="p-6 animate-fade-in">
-            <div className="studio-section">
-              <h3 className="text-xl font-medium mb-4">Schedule List</h3>
-              <div className="space-y-4">
-                {scheduleData.schedule?.map((day, index) => (
-                  <div key={index} className="p-4 bg-studio-blue/40 border border-studio-border rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 mr-2 text-studio-accent" />
-                        <span className="font-medium">Day {index + 1} ({format(new Date(day.date), 'MMMM d, yyyy')})</span>
-                      </div>
-                      <span className="text-sm text-studio-text-secondary">8:00 AM - 6:00 PM</span>
-                    </div>
-                    <div className="space-y-2">
-                      {day.scenes.map((scene, sceneIndex) => (
-                        <div key={sceneIndex} className="p-2 bg-studio-blue/30 rounded flex justify-between">
-                          <div>
-                            <span className="text-studio-accent">Scene {scene.scene_id}</span>
-                            <span className="mx-2 text-studio-text-secondary">|</span>
-                            <span>{scene.location_id}</span>
-                          </div>
-                          <span className="text-sm text-studio-text-secondary">
-                            {scene.start_time} - {scene.end_time}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Location Plan */}
-        {activeSubtab === 2 && (
-          <div className="p-6 animate-fade-in">
-            <div className="studio-section">
-              <h3 className="text-xl font-medium mb-4">Location Plan</h3>
-              {scheduleData.crew_allocation?.department_schedules ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(scheduleData.crew_allocation.department_schedules).map(([dept, info], index) => (
-                    <div key={index} className="p-4 bg-studio-blue/40 border border-studio-border rounded-lg">
-                      <h4 className="text-lg font-medium mb-2">{dept}</h4>
-                      <div className="space-y-2">
-                        <p><strong>Crew:</strong> {info.crew.join(', ')}</p>
-                        <p><strong>Equipment:</strong> {info.equipment.join(', ')}</p>
-                        {info.notes.length > 0 && (
-                          <div>
-                            <strong>Notes:</strong>
-                            <ul className="list-disc list-inside">
-                              {info.notes.map((note, i) => (
-                                <li key={i}>{note}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-studio-text-secondary">No department schedule data available.</p>
-              )}
-            </div>
-          </div>
+        ) : (
+          <>
+            {activeSubtab === 0 && renderCalendarView()}
+            {activeSubtab === 1 && renderScheduleList()}
+            {activeSubtab === 2 && renderLocationPlan()}
+            {activeSubtab === 3 && renderCrewAllocation()}
+            {activeSubtab === 4 && renderEquipment()}
+            {activeSubtab === 5 && renderGanttChart()}
+          </>
         )}
       </div>
     </div>
