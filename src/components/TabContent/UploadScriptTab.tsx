@@ -43,6 +43,14 @@ const UploadScriptTab: React.FC = () => {
     const file = event.target.files?.[0];
     if (file) {
       setFile(file);
+      setUploadMode('file'); // Ensure we switch to file mode when a file is selected
+    }
+  };
+
+  const handleScriptTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setScriptText(e.target.value);
+    if (e.target.value.trim() !== '') {
+      setUploadMode('text'); // Switch to text mode when text is entered
     }
   };
 
@@ -77,6 +85,10 @@ const UploadScriptTab: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Check if we can submit the script
+  const canSubmitScript = 
+    !isLoading && ((uploadMode === 'file' && file) || (uploadMode === 'text' && scriptText.trim() !== ''));
 
   return (
     <div className="p-6 h-full overflow-y-auto bg-gray-50 animate-fade-in">
@@ -117,7 +129,7 @@ const UploadScriptTab: React.FC = () => {
         
         {/* Upload Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-6">
+          <div className={`bg-white border ${uploadMode === 'file' ? 'border-purple-300 ring-1 ring-purple-200' : 'border-gray-100'} shadow-sm rounded-xl p-6`}>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
                 <Upload className="h-4 w-4 text-purple-600" />
@@ -127,7 +139,10 @@ const UploadScriptTab: React.FC = () => {
               </h3>
             </div>
             
-            <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center bg-gray-50">
+            <div 
+              className={`border-2 border-dashed ${file ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50'} rounded-lg p-8 text-center cursor-pointer`}
+              onClick={() => document.getElementById('script-upload')?.click()}
+            >
               <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <h3 className="text-lg font-medium mb-2 text-gray-700">Drag & drop your file here</h3>
               <p className="text-gray-500 mb-4">
@@ -143,7 +158,10 @@ const UploadScriptTab: React.FC = () => {
               <Button
                 variant="outline"
                 className="border-purple-200 text-purple-600 hover:bg-purple-50"
-                onClick={() => document.getElementById('script-upload')?.click()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById('script-upload')?.click();
+                }}
               >
                 Choose File
               </Button>
@@ -160,7 +178,7 @@ const UploadScriptTab: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white border border-gray-100 shadow-sm rounded-xl p-6">
+          <div className={`bg-white border ${uploadMode === 'text' ? 'border-purple-300 ring-1 ring-purple-200' : 'border-gray-100'} shadow-sm rounded-xl p-6`}>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
                 <FileText className="h-4 w-4 text-purple-600" />
@@ -174,7 +192,8 @@ const UploadScriptTab: React.FC = () => {
               className="w-full h-64 bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-mono focus:outline-none focus:ring-1 focus:ring-purple-300 focus:border-purple-300"
               placeholder="Paste your script text here..."
               value={scriptText}
-              onChange={(e) => setScriptText(e.target.value)}
+              onChange={handleScriptTextChange}
+              onClick={() => setUploadMode('text')}
             ></textarea>
           </div>
         </div>
@@ -202,7 +221,7 @@ const UploadScriptTab: React.FC = () => {
         <div className="mt-8 flex justify-end">
           <Button
             onClick={handleScriptSubmit}
-            disabled={isLoading || (uploadMode === 'file' && !file) || (uploadMode === 'text' && !scriptText)}
+            disabled={!canSubmitScript}
             className="px-8 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 rounded-lg text-white font-medium flex items-center"
           >
             {isLoading ? (
