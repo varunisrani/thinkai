@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { Users, ArrowsUpDown, Grid, BarChart2, Database } from 'lucide-react';
+import { Users, Grid, BarChart2, Database } from 'lucide-react';
+import { ArrowsUpDown } from '@/lib/icon-exports'; // Import from our icon-exports file
 import { cn } from '@/lib/utils';
 
 interface SubtabProps {
