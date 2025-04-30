@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  Calendar, List, MapPin, Users, Tool, Calendar as CalendarIcon, 
+  Calendar, List, MapPin, Users, Calendar as CalendarIcon, 
   FileText, ChartGantt, FilePieChart, Database
 } from 'lucide-react';
-import { Tool } from '@/lib/icon-exports'; // Import from our icon-exports file
+import { Tool } from '@/lib/icon-exports'; // Only import Tool from our custom exports
 import { cn } from '@/lib/utils';
 
 interface SubtabProps {
