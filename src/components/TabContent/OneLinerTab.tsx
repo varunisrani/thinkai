@@ -3,16 +3,21 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Download, Loader2 } from 'lucide-react';
 import { generateOneLiner, getOneLinerData, OneLinerData } from '@/services/scriptApiService';
 import { toast } from 'sonner';
+import { useScriptData } from '@/hooks/useScriptData';
 
 const OneLinerTab: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [oneLinerData, setOneLinerData] = useState<OneLinerData | null>(null);
+  const { updateOneLinerData } = useScriptData();
   
   useEffect(() => {
     // Load one-liner data from localStorage on component mount
     const data = getOneLinerData();
-    setOneLinerData(data);
-  }, []);
+    if (data) {
+      setOneLinerData(data);
+      updateOneLinerData(data);
+    }
+  }, [updateOneLinerData]);
 
   const handleGenerateOneLiner = async () => {
     setIsLoading(true);
@@ -20,6 +25,7 @@ const OneLinerTab: React.FC = () => {
       const result = await generateOneLiner();
       if (result) {
         setOneLinerData(result);
+        updateOneLinerData(result);
         toast.success('One-liner analysis completed successfully!');
       }
     } catch (error) {
@@ -128,13 +134,7 @@ const OneLinerTab: React.FC = () => {
                         <span className="bg-studio-accent text-white text-xs px-2 py-0.5 rounded-md mr-2">
                           Scene {scene.scene_number}
                         </span>
-                        <span className="text-studio-text-secondary font-mono text-sm">
-                          {/* Location would be fetched from script data if needed */}
-                        </span>
                       </div>
-                      <button className="text-xs text-studio-text-secondary hover:text-studio-accent">
-                        Edit
-                      </button>
                     </div>
                     <p className="text-studio-text-primary">
                       {scene.one_liner}
@@ -151,7 +151,6 @@ const OneLinerTab: React.FC = () => {
                   {oneLinerData.overall_summary}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {/* Tags would be extracted from the summary or provided by API */}
                   <span className="bg-studio-blue px-2 py-1 rounded-md text-xs text-studio-text-secondary">
                     Summary
                   </span>

@@ -1,5 +1,5 @@
 
-import React, { useState, createContext } from 'react';
+import React, { useState, createContext, useEffect } from 'react';
 import MainSidebar from '../components/MainSidebar';
 import AppHeader from '../components/AppHeader';
 import UploadScriptTab from '../components/TabContent/UploadScriptTab';
@@ -10,6 +10,7 @@ import ScheduleTab from '../components/TabContent/ScheduleTab';
 import BudgetTab from '../components/TabContent/BudgetTab';
 import StoryboardTab from '../components/TabContent/StoryboardTab';
 import ProjectOverviewTab from '../components/TabContent/ProjectOverviewTab';
+import { getStoredScriptData, getStoredOneLinerData, getStoredCharacterData, getStoredScheduleData, getStoredStoryboardData } from '@/services/storageService';
 import { ScriptData, OneLinerData, CharacterData, ScheduleData, StoryboardData } from '@/services/scriptApiService';
 
 // Create context for script data
@@ -45,11 +46,12 @@ export const ScriptDataContext = createContext<ScriptDataContextType>({
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState(0);
-  const [scriptData, setScriptData] = useState<ScriptData | null>(null);
-  const [oneLinerData, setOneLinerData] = useState<OneLinerData | null>(null);
-  const [characterData, setCharacterData] = useState<CharacterData | null>(null);
-  const [scheduleData, setScheduleData] = useState<ScheduleData | null>(null);
-  const [storyboardData, setStoryboardData] = useState<StoryboardData | null>(null);
+  // Initialize states with data from localStorage
+  const [scriptData, setScriptData] = useState<ScriptData | null>(getStoredScriptData());
+  const [oneLinerData, setOneLinerData] = useState<OneLinerData | null>(getStoredOneLinerData());
+  const [characterData, setCharacterData] = useState<CharacterData | null>(getStoredCharacterData());
+  const [scheduleData, setScheduleData] = useState<ScheduleData | null>(getStoredScheduleData());
+  const [storyboardData, setStoryboardData] = useState<StoryboardData | null>(getStoredStoryboardData());
 
   // Mapping of tab indices to their components
   const tabComponents = [

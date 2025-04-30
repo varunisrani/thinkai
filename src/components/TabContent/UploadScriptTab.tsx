@@ -3,12 +3,15 @@ import React, { useState } from 'react';
 import { Upload, FileText, Settings, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadScriptFile, analyzeScriptText } from '@/services/scriptApiService';
+import { useScriptData } from '@/hooks/useScriptData';
 
 const UploadScriptTab: React.FC = () => {
   const [uploadMode, setUploadMode] = useState<'file' | 'text'>('file');
   const [scriptText, setScriptText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  const { updateScriptData } = useScriptData();
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -21,17 +24,21 @@ const UploadScriptTab: React.FC = () => {
     setIsLoading(true);
     try {
       if (uploadMode === 'file' && file) {
-        // Handle file upload with new API
+        // Handle file upload with API
         const result = await uploadScriptFile(file);
         
         if (result) {
+          // Update context with the script data
+          updateScriptData(result);
           toast.success('Script uploaded and processed successfully!');
         }
       } else if (uploadMode === 'text' && scriptText) {
-        // Handle text input with new API
+        // Handle text input with API
         const result = await analyzeScriptText(scriptText);
         
         if (result) {
+          // Update context with the script data
+          updateScriptData(result);
           toast.success('Script text processed successfully!');
         }
       } else {

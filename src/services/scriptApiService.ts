@@ -1,5 +1,9 @@
-
 import { toast } from "sonner";
+import {
+  getFromLocalStorage,
+  saveToLocalStorage,
+  STORAGE_KEYS
+} from "./storageService";
 
 // Base API URL
 const API_BASE_URL = "https://varun324242-sjuu.hf.space";
@@ -293,6 +297,22 @@ async function fetchFromAPI<T>(
     }
     
     const data = await response.json();
+    
+    // Check for the API response structure
+    if (data && typeof data === 'object') {
+      // If response has success field (matches ApiResponse model in API.py)
+      if ('success' in data) {
+        if (!data.success) {
+          throw new Error(data.error || 'API returned error status');
+        }
+        // Return the data field if it exists, otherwise the whole response
+        return (data.data !== undefined) ? data.data as T : data as T;
+      }
+      
+      // Otherwise return the whole response
+      return data as T;
+    }
+    
     return data as T;
   } catch (error) {
     console.error(`API Error (${endpoint}):`, error);
@@ -301,22 +321,14 @@ async function fetchFromAPI<T>(
   }
 }
 
-// Local storage keys
-const STORAGE_KEYS = {
-  SCRIPT_DATA: 'script_data',
-  ONE_LINER_DATA: 'one_liner_data',
-  CHARACTER_DATA: 'character_data',
-  SCHEDULE_DATA: 'schedule_data',
-  STORYBOARD_DATA: 'storyboard_data',
-};
-
 // Script processing APIs
 export async function uploadScriptFile(file: File): Promise<ScriptData | null> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('validation_level', 'lenient');
 
   try {
-    const response = await fetch(`${API_BASE_URL}/upload_script`, {
+    const response = await fetch(`${API_BASE_URL}/api/script/upload`, {
       method: 'POST',
       body: formData,
     });
@@ -326,10 +338,11 @@ export async function uploadScriptFile(file: File): Promise<ScriptData | null> {
       throw new Error(errorText || `API Error: ${response.status}`);
     }
     
-    const data = await response.json() as ScriptData;
+    const responseData = await response.json();
+    const data = responseData.data as ScriptData;
     
     // Store in localStorage
-    localStorage.setItem(STORAGE_KEYS.SCRIPT_DATA, JSON.stringify(data));
+    saveToLocalStorage(STORAGE_KEYS.SCRIPT_DATA, data);
     
     return data;
   } catch (error) {
@@ -341,19 +354,26 @@ export async function uploadScriptFile(file: File): Promise<ScriptData | null> {
 
 export async function analyzeScriptText(scriptText: string): Promise<ScriptData | null> {
   try {
-    const data = await fetchFromAPI<ScriptData>('/analyze_script', {
+    const responseData = await fetchFromAPI<{success: boolean, data: ScriptData, error?: string}>('/api/script/text', {
       method: 'POST',
-      body: JSON.stringify({ script: scriptText }),
+      body: JSON.stringify({ script: scriptText, validation_level: 'lenient' }),
     });
     
-    if (data) {
+    if (responseData && 'data' in responseData) {
+      const data = responseData.data;
       // Store in localStorage
-      localStorage.setItem(STORAGE_KEYS.SCRIPT_DATA, JSON.stringify(data));
+      saveToLocalStorage(STORAGE_KEYS.SCRIPT_DATA, data);
+      return data;
+    } else if (responseData) {
+      // Handle case where the response doesn't match expected structure
+      saveToLocalStorage(STORAGE_KEYS.SCRIPT_DATA, responseData);
+      return responseData as unknown as ScriptData;
     }
     
-    return data;
+    return null;
   } catch (error) {
     console.error('Error analyzing script text:', error);
+    toast.error(`Analysis Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -361,26 +381,33 @@ export async function analyzeScriptText(scriptText: string): Promise<ScriptData 
 // One-liner API
 export async function generateOneLiner(): Promise<OneLinerData | null> {
   // First check if we have script data in local storage
-  const scriptData = localStorage.getItem(STORAGE_KEYS.SCRIPT_DATA);
+  const scriptData = getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
   if (!scriptData) {
     toast.error('No script data available. Please upload a script first.');
     return null;
   }
 
   try {
-    const data = await fetchFromAPI<OneLinerData>('/generate_one_liner', {
+    const responseData = await fetchFromAPI<{success: boolean, data: OneLinerData, error?: string}>('/api/one-liner', {
       method: 'POST',
-      body: scriptData,
+      body: JSON.stringify(scriptData),
     });
     
-    if (data) {
+    if (responseData && 'data' in responseData) {
+      const data = responseData.data;
       // Store in localStorage
-      localStorage.setItem(STORAGE_KEYS.ONE_LINER_DATA, JSON.stringify(data));
+      saveToLocalStorage(STORAGE_KEYS.ONE_LINER_DATA, data);
+      return data;
+    } else if (responseData) {
+      // Handle case where the response doesn't match expected structure
+      saveToLocalStorage(STORAGE_KEYS.ONE_LINER_DATA, responseData);
+      return responseData as unknown as OneLinerData;
     }
     
-    return data;
+    return null;
   } catch (error) {
     console.error('Error generating one-liner:', error);
+    toast.error(`One-liner Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -388,26 +415,33 @@ export async function generateOneLiner(): Promise<OneLinerData | null> {
 // Character breakdown API
 export async function analyzeCharacters(): Promise<CharacterData | null> {
   // First check if we have script data in local storage
-  const scriptData = localStorage.getItem(STORAGE_KEYS.SCRIPT_DATA);
+  const scriptData = getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
   if (!scriptData) {
     toast.error('No script data available. Please upload a script first.');
     return null;
   }
 
   try {
-    const data = await fetchFromAPI<CharacterData>('/analyze_characters', {
+    const responseData = await fetchFromAPI<{success: boolean, data: CharacterData, error?: string}>('/api/characters', {
       method: 'POST',
-      body: scriptData,
+      body: JSON.stringify({ script_data: scriptData }),
     });
     
-    if (data) {
+    if (responseData && 'data' in responseData) {
+      const data = responseData.data;
       // Store in localStorage
-      localStorage.setItem(STORAGE_KEYS.CHARACTER_DATA, JSON.stringify(data));
+      saveToLocalStorage(STORAGE_KEYS.CHARACTER_DATA, data);
+      return data;
+    } else if (responseData) {
+      // Handle case where the response doesn't match expected structure
+      saveToLocalStorage(STORAGE_KEYS.CHARACTER_DATA, responseData);
+      return responseData as unknown as CharacterData;
     }
     
-    return data;
+    return null;
   } catch (error) {
     console.error('Error analyzing characters:', error);
+    toast.error(`Character Analysis Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -415,8 +449,8 @@ export async function analyzeCharacters(): Promise<CharacterData | null> {
 // Schedule API
 export async function createSchedule(startDate: string): Promise<ScheduleData | null> {
   // First check if we have script and character data in local storage
-  const scriptData = localStorage.getItem(STORAGE_KEYS.SCRIPT_DATA);
-  const characterData = localStorage.getItem(STORAGE_KEYS.CHARACTER_DATA);
+  const scriptData = getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
+  const characterData = getFromLocalStorage<CharacterData>(STORAGE_KEYS.CHARACTER_DATA);
   
   if (!scriptData || !characterData) {
     toast.error('Script and character data required. Please complete those steps first.');
@@ -425,24 +459,33 @@ export async function createSchedule(startDate: string): Promise<ScheduleData | 
 
   try {
     const requestData = {
-      script_data: JSON.parse(scriptData),
-      character_data: JSON.parse(characterData),
+      script_results: scriptData,
+      character_results: characterData,
       start_date: startDate,
+      location_constraints: {"preferred_locations": [], "avoid_weather": ["Rain", "Snow", "High Winds"]},
+      schedule_constraints: {"max_hours_per_day": 12, "meal_break_duration": 60, "company_moves_per_day": 2}
     };
 
-    const data = await fetchFromAPI<ScheduleData>('/create_schedule', {
+    const responseData = await fetchFromAPI<{success: boolean, data: ScheduleData, error?: string}>('/api/schedule', {
       method: 'POST',
       body: JSON.stringify(requestData),
     });
     
-    if (data) {
+    if (responseData && 'data' in responseData) {
+      const data = responseData.data;
       // Store in localStorage
-      localStorage.setItem(STORAGE_KEYS.SCHEDULE_DATA, JSON.stringify(data));
+      saveToLocalStorage(STORAGE_KEYS.SCHEDULE_DATA, data);
+      return data;
+    } else if (responseData) {
+      // Handle case where the response doesn't match expected structure
+      saveToLocalStorage(STORAGE_KEYS.SCHEDULE_DATA, responseData);
+      return responseData as unknown as ScheduleData;
     }
     
-    return data;
+    return null;
   } catch (error) {
     console.error('Error creating schedule:', error);
+    toast.error(`Schedule Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -453,89 +496,160 @@ export async function generateStoryboard(
   sceneDescription: string,
   shotType: string = 'MS',
   cameraAngle: string = 'eye_level',
-  mood: string = 'neutral'
+  mood: string = 'neutral',
+  stylePrompt: string = ''
 ): Promise<StoryboardData | null> {
   try {
     const requestData = {
       scene_id: sceneId,
       scene_description: sceneDescription,
-      technical_params: {
-        shot_type: shotType,
-        camera_angle: cameraAngle,
-        mood: mood
-      }
+      style_prompt: stylePrompt,
+      shot_type: shotType,
+      mood: mood,
+      camera_angle: cameraAngle
     };
 
-    const data = await fetchFromAPI<StoryboardData>('/generate_storyboard', {
+    const responseData = await fetchFromAPI<{success: boolean, data: any, error?: string}>('/api/storyboard', {
       method: 'POST',
       body: JSON.stringify(requestData),
     });
     
-    if (data) {
-      // Get existing storyboard data or initialize empty
-      const existingData = localStorage.getItem(STORAGE_KEYS.STORYBOARD_DATA);
-      let updatedData: StoryboardData;
+    if (!responseData) {
+      return null;
+    }
+
+    // Get existing storyboard data or initialize empty
+    const existingData = getFromLocalStorage<StoryboardData>(STORAGE_KEYS.STORYBOARD_DATA);
+    let updatedData: StoryboardData;
+    
+    // Single scene response (might not have scenes array)
+    const singleSceneData = responseData.data || responseData;
+    
+    if (existingData) {
+      // Check if the scene already exists in our stored data
+      const sceneIndex = existingData.scenes.findIndex(s => s.scene_id === sceneId);
       
-      if (existingData) {
-        const parsedData = JSON.parse(existingData) as StoryboardData;
-        // Check if scene already exists and update or add
-        const sceneIndex = parsedData.scenes.findIndex(s => s.scene_id === sceneId);
-        if (sceneIndex >= 0) {
-          parsedData.scenes[sceneIndex] = data.scenes[0];
-          updatedData = parsedData;
+      if (sceneIndex >= 0) {
+        // Update existing scene
+        if ('scenes' in singleSceneData && Array.isArray(singleSceneData.scenes)) {
+          // If response has scenes array, use the first item
+          existingData.scenes[sceneIndex] = singleSceneData.scenes[0];
         } else {
+          // If response is just the scene data
+          existingData.scenes[sceneIndex] = singleSceneData;
+        }
+        updatedData = existingData;
+      } else {
+        // Add new scene
+        if ('scenes' in singleSceneData && Array.isArray(singleSceneData.scenes)) {
+          // If response has scenes array, add them all
           updatedData = {
-            scenes: [...parsedData.scenes, ...data.scenes]
+            scenes: [...existingData.scenes, ...singleSceneData.scenes]
+          };
+        } else {
+          // If response is just the scene data
+          updatedData = {
+            scenes: [...existingData.scenes, singleSceneData]
           };
         }
-      } else {
-        updatedData = data;
       }
-      
-      // Store updated data in localStorage
-      localStorage.setItem(STORAGE_KEYS.STORYBOARD_DATA, JSON.stringify(updatedData));
-      return updatedData;
+    } else {
+      // No existing data
+      if ('scenes' in singleSceneData && Array.isArray(singleSceneData.scenes)) {
+        // If response has scenes array, use it
+        updatedData = singleSceneData;
+      } else {
+        // If response is just the scene data
+        updatedData = {
+          scenes: [singleSceneData]
+        };
+      }
     }
     
-    return null;
+    // Store updated data in localStorage
+    saveToLocalStorage(STORAGE_KEYS.STORYBOARD_DATA, updatedData);
+    return updatedData;
   } catch (error) {
     console.error('Error generating storyboard:', error);
+    toast.error(`Storyboard Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
 
-// Utility functions to get data from localStorage
+// Batch storyboard generation for multiple scenes
+export async function generateStoryboardBatch(): Promise<StoryboardData | null> {
+  // First check if we have script data in local storage
+  const scriptData = getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
+  if (!scriptData) {
+    toast.error('No script data available. Please upload a script first.');
+    return null;
+  }
+
+  try {
+    const requestData = {
+      script_results: scriptData,
+      shot_settings: {
+        default_shot_type: "MS",
+        style: "realistic",
+        mood: "neutral",
+        camera_angle: "eye_level"
+      }
+    };
+
+    const responseData = await fetchFromAPI<{success: boolean, data: StoryboardData, error?: string}>('/api/storyboard/batch', {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+    });
+    
+    if (responseData && 'data' in responseData) {
+      const data = responseData.data;
+      // Store in localStorage
+      saveToLocalStorage(STORAGE_KEYS.STORYBOARD_DATA, data);
+      return data;
+    } else if (responseData) {
+      // Handle case where the response doesn't match expected structure
+      saveToLocalStorage(STORAGE_KEYS.STORYBOARD_DATA, responseData);
+      return responseData as unknown as StoryboardData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error generating batch storyboards:', error);
+    toast.error(`Storyboard Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return null;
+  }
+}
+
+// Utility functions to get data from storage service
 export function getScriptData(): ScriptData | null {
-  const data = localStorage.getItem(STORAGE_KEYS.SCRIPT_DATA);
-  return data ? JSON.parse(data) : null;
+  return getFromLocalStorage<ScriptData>(STORAGE_KEYS.SCRIPT_DATA);
 }
 
 export function getOneLinerData(): OneLinerData | null {
-  const data = localStorage.getItem(STORAGE_KEYS.ONE_LINER_DATA);
-  return data ? JSON.parse(data) : null;
+  return getFromLocalStorage<OneLinerData>(STORAGE_KEYS.ONE_LINER_DATA);
 }
 
 export function getCharacterData(): CharacterData | null {
-  const data = localStorage.getItem(STORAGE_KEYS.CHARACTER_DATA);
-  return data ? JSON.parse(data) : null;
+  return getFromLocalStorage<CharacterData>(STORAGE_KEYS.CHARACTER_DATA);
 }
 
 export function getScheduleData(): ScheduleData | null {
-  const data = localStorage.getItem(STORAGE_KEYS.SCHEDULE_DATA);
-  return data ? JSON.parse(data) : null;
+  return getFromLocalStorage<ScheduleData>(STORAGE_KEYS.SCHEDULE_DATA);
 }
 
 export function getStoryboardData(): StoryboardData | null {
-  const data = localStorage.getItem(STORAGE_KEYS.STORYBOARD_DATA);
-  return data ? JSON.parse(data) : null;
+  return getFromLocalStorage<StoryboardData>(STORAGE_KEYS.STORYBOARD_DATA);
 }
 
-// Function to clear all data from localStorage
+// Function to clear all data
 export function clearAllData(): void {
-  localStorage.removeItem(STORAGE_KEYS.SCRIPT_DATA);
-  localStorage.removeItem(STORAGE_KEYS.ONE_LINER_DATA);
-  localStorage.removeItem(STORAGE_KEYS.CHARACTER_DATA);
-  localStorage.removeItem(STORAGE_KEYS.SCHEDULE_DATA);
-  localStorage.removeItem(STORAGE_KEYS.STORYBOARD_DATA);
+  [
+    STORAGE_KEYS.SCRIPT_DATA,
+    STORAGE_KEYS.ONE_LINER_DATA,
+    STORAGE_KEYS.CHARACTER_DATA,
+    STORAGE_KEYS.SCHEDULE_DATA,
+    STORAGE_KEYS.STORYBOARD_DATA
+  ].forEach(key => localStorage.removeItem(key));
+  
   toast.success('All script data cleared successfully');
 }
