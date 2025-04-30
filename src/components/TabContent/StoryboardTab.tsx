@@ -110,6 +110,24 @@ interface ScriptDataWithScenes {
   };
 }
 
+interface StoryboardScene {
+  scene_id: string;
+  description: string;
+  prompt: string;
+  enhanced_prompt: string;
+  image_url: string;
+  image_path: string;
+  technical_params: {
+    shot_type: string;
+    camera_angle: string;
+    mood: string;
+  };
+}
+
+interface ParsedStoryboardData {
+  scenes: StoryboardScene[];
+}
+
 const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
   const { 
     scriptData, 
@@ -158,10 +176,10 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
           const parsedData = JSON.parse(storedData);
           logDebug('Found storyboard data in localStorage, loading it');
           
-          // Ensure the data matches the expected structure
-          const formattedData = {
-            scenes: parsedData.scenes.map((scene: any) => ({
-              scene_id: scene.scene_id,
+          // Ensure the data matches the expected structure with required fields
+          const formattedData: ParsedStoryboardData = {
+            scenes: parsedData.scenes.map((scene: Partial<StoryboardScene>) => ({
+              scene_id: scene.scene_id || '',
               description: scene.description || '',
               prompt: scene.prompt || '',
               enhanced_prompt: scene.enhanced_prompt || '',
@@ -180,8 +198,9 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
         } else {
           logDebug('No storyboard data found in localStorage');
         }
-      } catch (err) {
-        logDebug('Error loading storyboard data from localStorage:', err);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        logDebug('Error loading storyboard data from localStorage:', errorMessage);
       }
     }
   }, []);
@@ -315,9 +334,9 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
 
       toast.success('Storyboard generated successfully!');
       setSuccess('Storyboard generated successfully!');
-    } catch (err: any) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate storyboard';
-      logDebug('Error during storyboard generation:', err);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate storyboard';
+      logDebug('Error during storyboard generation:', error);
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -337,9 +356,9 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
     try {
       logDebug('Generating full storyboard');
       
-      // Create proper payload structure with scenario_results
+      // Create proper payload structure with script_results
       const apiPayload = {
-        scenario_results: scriptData, // This was previously script_results: scriptData
+        script_results: scriptData, // Using script_results as in the old code
         shot_settings: storyboardSettings.shot_settings
       };
       
@@ -380,9 +399,9 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
       updateStoryboardData(processedData);
       toast.success('Full storyboard generated successfully!');
       setSuccess('Full storyboard generated successfully!');
-    } catch (err: any) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate storyboard';
-      logDebug('Error during full storyboard generation:', err);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate storyboard';
+      logDebug('Error during full storyboard generation:', error);
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
