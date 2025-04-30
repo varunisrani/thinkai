@@ -83,7 +83,7 @@ const Index = () => {
 
   return (
     <ScriptDataContext.Provider value={contextValue}>
-      <div className="h-screen flex flex-col">
+      <div className="h-screen flex flex-col bg-gray-50">
         <AppHeader />
         
         <div className="flex-1 flex overflow-hidden">

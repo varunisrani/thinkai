@@ -20,7 +20,7 @@ interface MainSidebarProps {
 
 const MainSidebar: React.FC<MainSidebarProps> = ({ activeTab, setActiveTab }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
 
   const sidebarItems: SidebarItem[] = [
     { icon: Upload, label: 'Upload Script', index: 0 },
@@ -40,25 +40,25 @@ const MainSidebar: React.FC<MainSidebarProps> = ({ activeTab, setActiveTab }) =>
 
   return (
     <div className={cn(
-      'h-full flex flex-col bg-studio-blue border-r border-studio-border transition-all duration-300',
+      'h-full flex flex-col bg-white border-r border-gray-100 transition-all duration-300',
       collapsed ? 'w-16' : 'w-64'
     )}>
-      <div className="flex items-center justify-between p-4 border-b border-studio-border">
+      <div className="flex items-center justify-between p-4 border-b border-gray-100">
         {!collapsed && (
           <div className="flex items-center">
-            <Film className="h-6 w-6 text-studio-accent mr-2" />
-            <span className="text-lg font-semibold text-studio-text-primary">
+            <Film className="h-6 w-6 text-purple-600 mr-2" />
+            <span className="text-lg font-semibold text-gray-800">
               AI Studio
             </span>
           </div>
         )}
-        {collapsed && <Film className="h-6 w-6 text-studio-accent mx-auto" />}
+        {collapsed && <Film className="h-6 w-6 text-purple-600 mx-auto" />}
         
         <button 
           onClick={() => setCollapsed(!collapsed)} 
-          className="p-1 rounded-md hover:bg-studio-blue/50"
+          className="p-1 rounded-md hover:bg-gray-100"
         >
-          <Menu className="h-5 w-5 text-studio-text-secondary" />
+          <Menu className="h-5 w-5 text-gray-500" />
         </button>
       </div>
       
@@ -68,10 +68,10 @@ const MainSidebar: React.FC<MainSidebarProps> = ({ activeTab, setActiveTab }) =>
             <button
               key={item.index}
               className={cn(
-                'w-full flex items-center px-3 py-2.5 rounded-md mb-1 transition-colors',
+                'w-full flex items-center px-3 py-2.5 rounded-lg mb-1 transition-colors',
                 activeTab === item.index
-                  ? 'bg-studio-accent text-white'
-                  : 'text-studio-text-secondary hover:bg-studio-blue/50 hover:text-studio-text-primary'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               )}
               onClick={() => setActiveTab(item.index)}
             >
@@ -83,12 +83,12 @@ const MainSidebar: React.FC<MainSidebarProps> = ({ activeTab, setActiveTab }) =>
         </nav>
       </div>
       
-      <div className="p-4 border-t border-studio-border space-y-2">
+      <div className="p-4 border-t border-gray-100 space-y-2">
         <a 
           href="#api-logs" 
           className={cn(
             'flex items-center px-3 py-2 rounded-md transition-colors',
-            'text-studio-text-secondary hover:bg-studio-blue/50 hover:text-studio-text-primary'
+            'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           )}
         >
           <Database className={cn('h-5 w-5 flex-shrink-0', 
@@ -100,7 +100,7 @@ const MainSidebar: React.FC<MainSidebarProps> = ({ activeTab, setActiveTab }) =>
           onClick={toggleTheme}
           className={cn(
             'flex items-center px-3 py-2 rounded-md w-full transition-colors',
-            'text-studio-text-secondary hover:bg-studio-blue/50 hover:text-studio-text-primary'
+            'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           )}
         >
           {darkMode ? (

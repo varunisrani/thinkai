@@ -64,14 +64,14 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				studio: {
-					'dark-blue': '#0A101F',
-					'blue': '#1E293B',
-					'accent': '#3B82F6',
-					'accent-hover': '#2563EB',
+					'dark-blue': '#ffffff',  // Changed to white
+					'blue': '#f7f7fa',      // Light gray/blue
+					'accent': '#7158e2',     // Purple accent from the image
+					'accent-hover': '#5e41d2',
 					'highlight': '#F59E0B',
-					'text-primary': '#F8FAFC',
-					'text-secondary': '#94A3B8',
-					'border': '#334155',
+					'text-primary': '#333333', // Dark text
+					'text-secondary': '#666666', // Medium gray text
+					'border': '#e1e1e8',    // Light border
 					'success': '#10B981',
 					'error': '#EF4444',
 					'warning': '#F59E0B'
