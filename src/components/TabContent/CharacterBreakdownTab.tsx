@@ -91,10 +91,14 @@ interface RelationshipEvent {
   trigger?: string;
 }
 
-interface CharacterRelation {
+interface Relationship {
   type: string | null;
   dynamics: string[];
-  evolution: RelationshipEvent[];
+  evolution: Array<{
+    scene: number;
+    dynamic_change: string;
+    trigger: string;
+  }>;
   interactions: string[];
   conflicts: string[];
 }
@@ -112,7 +116,14 @@ interface Character {
   action_sequences?: ActionSequence[];
   scene_presence?: string[];
   objectives?: CharacterObjectives;
-  makeup?: Makeup;
+  makeup?: {
+    base?: { item: string };
+    timeline?: Array<{
+      scene: string;
+      changes: { item: string };
+      special_effects: string[];
+    }>;
+  };
   props?: {
     base?: string[];
     timeline?: PropChange[];
@@ -168,13 +179,6 @@ interface EmotionalJourneyEntry {
   trigger: string;
 }
 
-interface RelationshipData {
-  type: string | null;
-  dynamics: string[];
-  interactions: string[];
-  conflicts: string[];
-}
-
 interface SceneMatrixData {
   characters?: string[];
   present_characters?: string[];
@@ -190,7 +194,7 @@ interface EmotionalStats {
 
 interface TechnicalStats {
   total_props: number;
-  total_changes: number;
+  unique_props: number;
 }
 
 interface MakeupStats {
@@ -201,10 +205,24 @@ interface CostumeStats {
   total_changes: number;
 }
 
-interface RelationshipStats {
-  total_interactions: number;
-  total_conflicts: number;
-  dynamic_changes: number;
+interface Statistics {
+  scene_stats: {
+    total_scenes: number;
+    average_characters_per_scene: number;
+    total_interactions: number;
+  };
+  dialogue_stats: Record<string, DialogueStats>;
+  emotional_stats: Record<string, EmotionalStats>;
+  technical_stats: {
+    prop_usage: Record<string, { total_props: number; unique_props: number }>;
+    makeup_changes: Record<string, { total_changes: number }>;
+    costume_changes: Record<string, { total_changes: number }>;
+  };
+  relationship_stats: Record<string, {
+    total_interactions: number;
+    total_conflicts: number;
+    dynamic_changes: number;
+  }>;
 }
 
 const Subtab: React.FC<SubtabProps> = ({ active, icon: Icon, label, onClick }) => (
@@ -223,13 +241,22 @@ const Subtab: React.FC<SubtabProps> = ({ active, icon: Icon, label, onClick }) =
 // Type-safe render functions
 const renderCharacter = (charData: Character & { __name?: string }) => {
   // Extract data safely
-  const primaryEmotion = charData?.emotional_range?.primary_emotion || 'Unknown';
-  const emotionalSpectrum = charData?.emotional_range?.emotional_spectrum || [];
   const dialogueAnalysis = charData?.dialogue_analysis || {
     total_lines: 0,
     total_words: 0,
     average_line_length: 0,
-    vocabulary_complexity: 0
+    vocabulary_complexity: 0,
+    patterns: {
+      common_phrases: [],
+      speech_style: '',
+      emotional_markers: []
+    }
+  };
+  
+  const emotionalRange = charData?.emotional_range || {
+    primary_emotion: '',
+    emotional_spectrum: [],
+    emotional_journey: []
   };
   
   const actionSequences = charData?.action_sequences || [];
@@ -240,139 +267,201 @@ const renderCharacter = (charData: Character & { __name?: string }) => {
 
   return (
     <div className="bg-studio-blue/40 border border-studio-border rounded-lg p-4">
-      <div className="flex items-center mb-3">
+      {/* Character Header */}
+      <div className="flex items-center mb-4">
         <div className="h-12 w-12 rounded-full bg-studio-accent/30 flex items-center justify-center text-studio-accent font-bold">
           {charData.__name?.charAt(0) || '?'}
         </div>
         <div className="ml-3">
-          <h4 className="font-medium text-studio-text-primary">{charData.__name || 'Unknown'}</h4>
+          <h4 className="font-medium text-studio-text-primary text-lg">{charData.__name || 'Unknown'}</h4>
           <p className="text-sm text-studio-text-secondary">
-            Primary emotion: <span className="font-medium">{primaryEmotion}</span>
+            Primary emotion: <span className="font-medium">{emotionalRange.primary_emotion}</span>
           </p>
         </div>
       </div>
       
-      <div className="mb-4">
-        <h5 className="text-sm font-medium text-studio-text-secondary mb-1">Emotional Range:</h5>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {emotionalSpectrum.map((emotion: string, i: number) => (
-            <span key={i} className="bg-studio-blue px-2 py-1 rounded-md text-xs text-studio-text-secondary">
-              {emotion}
-            </span>
-          ))}
-          {emotionalSpectrum.length === 0 && (
-            <span className="text-studio-text-secondary text-xs">No emotional traits defined</span>
+      {/* Dialogue Analysis */}
+      <div className="mb-6">
+        <h5 className="text-sm font-medium text-studio-text-primary mb-2">Dialogue Analysis</h5>
+        <div className="bg-studio-blue/30 p-3 rounded-lg space-y-3">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-studio-text-secondary">Lines:</span>
+              <span>{dialogueAnalysis.total_lines}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-studio-text-secondary">Words:</span>
+              <span>{dialogueAnalysis.total_words}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-studio-text-secondary">Avg Length:</span>
+              <span>{dialogueAnalysis.average_line_length?.toFixed(1)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-studio-text-secondary">Complexity:</span>
+              <span>{dialogueAnalysis.vocabulary_complexity?.toFixed(1)}</span>
+            </div>
+          </div>
+
+          {dialogueAnalysis.patterns && (
+            <div className="space-y-2 pt-2 border-t border-studio-border/30">
+              <div>
+                <p className="text-xs text-studio-text-secondary mb-1">Common Phrases:</p>
+                <div className="flex flex-wrap gap-1">
+                  {dialogueAnalysis.patterns.common_phrases?.map((phrase, i) => (
+                    <span key={i} className="bg-studio-blue/20 px-2 py-0.5 rounded text-xs">
+                      {phrase}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-studio-text-secondary mb-1">Speech Style:</p>
+                <p className="text-sm">{dialogueAnalysis.patterns.speech_style}</p>
+              </div>
+              <div>
+                <p className="text-xs text-studio-text-secondary mb-1">Emotional Markers:</p>
+                <div className="flex flex-wrap gap-1">
+                  {dialogueAnalysis.patterns.emotional_markers?.map((marker, i) => (
+                    <span key={i} className="bg-studio-accent/20 px-2 py-0.5 rounded text-xs">
+                      {marker}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="mb-4">
-        <h5 className="text-sm font-medium text-studio-text-secondary mb-1">Dialogue Analysis:</h5>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-studio-text-secondary">Lines:</span>
-            <span>{dialogueAnalysis.total_lines}</span>
+      {/* Emotional Range */}
+      <div className="mb-6">
+        <h5 className="text-sm font-medium text-studio-text-primary mb-2">Emotional Journey</h5>
+        <div className="bg-studio-blue/30 p-3 rounded-lg space-y-3">
+          <div>
+            <p className="text-xs text-studio-text-secondary mb-1">Emotional Spectrum:</p>
+            <div className="flex flex-wrap gap-1">
+              {emotionalRange.emotional_spectrum?.map((emotion, i) => (
+                <span key={i} className="bg-studio-accent/20 px-2 py-0.5 rounded text-xs">
+                  {emotion}
+                </span>
+              ))}
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-studio-text-secondary">Words:</span>
-            <span>{dialogueAnalysis.total_words}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-studio-text-secondary">Avg Length:</span>
-            <span>{dialogueAnalysis.average_line_length?.toFixed(1) || 'N/A'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-studio-text-secondary">Complexity:</span>
-            <span>{dialogueAnalysis.vocabulary_complexity?.toFixed(1) || 'N/A'}</span>
-          </div>
-        </div>
-        
-        {dialogueAnalysis.patterns && (
-          <div className="mt-2 text-xs">
-            <div className="text-studio-text-secondary">Speech Style:</div>
-            <div className="mt-1 italic">{dialogueAnalysis.patterns.speech_style}</div>
-          </div>
-        )}
-      </div>
-      
-      {actionSequences.length > 0 && (
-        <div className="mb-4">
-          <h5 className="text-sm font-medium text-studio-text-secondary mb-1">Key Actions:</h5>
-          <div className="space-y-1">
-            {actionSequences.map((action: ActionSequence, i: number) => (
-              <div key={i} className="bg-studio-blue/30 p-2 rounded-md text-xs">
-                <div className="flex justify-between mb-1">
-                  <span className="text-studio-text-secondary">Scene {action.scene}:</span>
-                  <span className="text-studio-accent">{action.emotional_context}</span>
+
+          <div className="space-y-2">
+            <p className="text-xs text-studio-text-secondary">Scene Progression:</p>
+            {emotionalRange.emotional_journey?.map((journey, i) => (
+              <div key={i} className="bg-studio-blue/20 p-2 rounded">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Scene {journey.scene}</span>
+                  <span className="text-studio-accent">
+                    Intensity: {(journey.intensity * 10).toFixed(0)}/10
+                  </span>
                 </div>
-                <p>{action.sequence}</p>
+                <p className="text-sm mb-1 font-medium">{journey.emotion}</p>
+                <p className="text-xs text-studio-text-secondary">Trigger: {journey.trigger}</p>
               </div>
             ))}
           </div>
         </div>
-      )}
-      
-      <div className="mb-4">
-        <h5 className="text-sm font-medium text-studio-text-secondary mb-1">Props:</h5>
-        <div className="text-xs">
-          <div className="flex flex-wrap gap-1 mb-1">
-            {baseProps.map((prop: string, i: number) => (
-              <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded">
-                {prop}
+      </div>
+
+      {/* Action Sequences */}
+      <div className="mb-6">
+        <h5 className="text-sm font-medium text-studio-text-primary mb-2">Action Sequences</h5>
+        <div className="space-y-2">
+          {actionSequences.map((action, i) => (
+            <div key={i} className="bg-studio-blue/30 p-3 rounded-lg">
+              <div className="flex justify-between text-xs text-studio-text-secondary mb-1">
+                <span>Scene {action.scene}</span>
+                <span>{action.interaction_type}</span>
+              </div>
+              <p className="text-sm mb-2">{action.sequence}</p>
+              <span className="text-xs px-2 py-0.5 bg-studio-accent/20 rounded">
+                {action.emotional_context}
               </span>
-            ))}
-            {baseProps.length === 0 && (
-              <span className="text-studio-text-secondary text-xs">No base props defined</span>
-            )}
-          </div>
-          
-          {propTimeline.length > 0 && (
-            <div className="mt-2">
-              <div className="text-studio-text-secondary mb-1">Changes:</div>
-              {propTimeline.map((change: PropChange, i: number) => (
-                <div key={i} className="ml-2 mb-1">
-                  <div>Scene {change.scene}:</div>
-                  {change.additions?.length > 0 && (
-                    <div className="ml-2 text-studio-success">
-                      + {change.additions.join(', ')}
-                    </div>
-                  )}
-                  {change.removals?.length > 0 && (
-                    <div className="ml-2 text-studio-warning">
-                      - {change.removals.join(', ')}
-                    </div>
-                  )}
-                </div>
-              ))}
             </div>
-          )}
+          ))}
         </div>
       </div>
-      
-      <div>
-        <h5 className="text-sm font-medium text-studio-text-secondary mb-1">Makeup:</h5>
-        <div className="text-xs">
-          <div className="mb-1">Base: {baseMakeup}</div>
-          
-          {makeupTimeline.length > 0 && (
-            <div>
-              <div className="text-studio-text-secondary mb-1">Changes:</div>
-              {makeupTimeline.map((change: { 
-                scene: string;
-                changes: { item: string };
-                special_effects?: string[];
-              }, i: number) => (
-                <div key={i} className="ml-2 mb-1">
-                  <div>Scene {change.scene}: {change.changes?.item}</div>
-                  {change.special_effects?.length > 0 && (
-                    <div className="ml-2 text-studio-accent">
-                      FX: {change.special_effects.join(', ')}
-                    </div>
-                  )}
-                </div>
-              ))}
+
+      {/* Makeup and Props */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Makeup */}
+        <div>
+          <h5 className="text-sm font-medium text-studio-text-primary mb-2">Makeup</h5>
+          <div className="bg-studio-blue/30 p-3 rounded-lg">
+            <div className="mb-3">
+              <p className="text-xs text-studio-text-secondary mb-1">Base Look:</p>
+              <p className="text-sm">{baseMakeup}</p>
             </div>
-          )}
+            {makeupTimeline.length > 0 && (
+              <div>
+                <p className="text-xs text-studio-text-secondary mb-1">Changes:</p>
+                <div className="space-y-2">
+                  {makeupTimeline.map((change, i) => (
+                    <div key={i} className="bg-studio-blue/20 p-2 rounded text-sm">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Scene {change.scene}</span>
+                      </div>
+                      <p className="mb-1">{change.changes.item}</p>
+                      {change.special_effects.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {change.special_effects.map((effect, j) => (
+                            <span key={j} className="text-xs bg-studio-accent/20 px-2 py-0.5 rounded">
+                              {effect}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Props */}
+        <div>
+          <h5 className="text-sm font-medium text-studio-text-primary mb-2">Props</h5>
+          <div className="bg-studio-blue/30 p-3 rounded-lg">
+            <div className="mb-3">
+              <p className="text-xs text-studio-text-secondary mb-1">Base Props:</p>
+              <div className="flex flex-wrap gap-1">
+                {baseProps.map((prop, i) => (
+                  <span key={i} className="bg-studio-blue/20 px-2 py-0.5 rounded text-sm">
+                    {prop}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {propTimeline.length > 0 && (
+              <div>
+                <p className="text-xs text-studio-text-secondary mb-1">Changes:</p>
+                <div className="space-y-2">
+                  {propTimeline.map((change, i) => (
+                    <div key={i} className="bg-studio-blue/20 p-2 rounded">
+                      <p className="text-xs mb-1">Scene {change.scene}</p>
+                      {change.additions.length > 0 && (
+                        <div className="mb-1">
+                          <span className="text-xs text-studio-success">+ </span>
+                          {change.additions.join(', ')}
+                        </div>
+                      )}
+                      {change.removals.length > 0 && (
+                        <div>
+                          <span className="text-xs text-studio-warning">- </span>
+                          {change.removals.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -660,7 +749,7 @@ const CharacterBreakdownTab: React.FC = () => {
                     {Object.entries(characterData.relationships).map(([relationKey, relation]) => {
                       // Extract character names from the relationship key
                       const charNames = relationKey.split('-');
-                      const relationData = relation as unknown as RelationshipData;
+                      const relationData = relation as Relationship;
                       
                       return (
                         <div key={relationKey} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
@@ -870,7 +959,7 @@ const CharacterBreakdownTab: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
                     <h4 className="font-medium mb-3">Dialogue Statistics</h4>
                     <div className="space-y-3">
@@ -905,70 +994,7 @@ const CharacterBreakdownTab: React.FC = () => {
                       })}
                     </div>
                   </div>
-                  
-                  <div className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                    <h4 className="font-medium mb-3">Technical Statistics</h4>
-                    <div className="grid grid-cols-1 gap-3">
-                      {Object.entries(characterData.statistics?.technical_stats?.prop_usage || {}).map(([charName, statData]) => {
-                        const technicalStats = statData as unknown as TechnicalStats;
-                        const makeupStats = ((characterData.statistics?.technical_stats?.makeup_changes || {})[charName] || {}) as unknown as MakeupStats;
-                        const costumeStats = ((characterData.statistics?.technical_stats?.costume_changes || {})[charName] || {}) as unknown as CostumeStats;
-                        
-                        return (
-                          <div key={charName} className="bg-studio-blue/30 p-3 rounded">
-                            <div className="font-medium mb-2">{charName}</div>
-                            <div className="grid grid-cols-3 gap-2 text-sm">
-                              <div>
-                                <div className="text-xs text-studio-text-secondary">Props:</div>
-                                <div>{technicalStats.total_props || 0}</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-studio-text-secondary">Makeup Changes:</div>
-                                <div>{makeupStats.total_changes || 0}</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-studio-text-secondary">Costume Changes:</div>
-                                <div>{costumeStats.total_changes || 0}</div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
-                
-                {/* Check if relationship stats exist */}
-                {characterData.statistics && 'relationship_stats' in characterData.statistics && (
-                  <div className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                    <h4 className="font-medium mb-3">Relationship Statistics</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {Object.entries(characterData.statistics.relationship_stats as Record<string, RelationshipStats>).map(([relationKey, statData]) => {
-                        const relationshipStats = statData;
-                        
-                        return (
-                          <div key={relationKey} className="bg-studio-blue/30 p-3 rounded">
-                            <div className="font-medium mb-2">{relationKey}</div>
-                            <div className="space-y-1 text-sm">
-                              <div className="flex justify-between">
-                                <span className="text-studio-text-secondary">Interactions:</span>
-                                <span>{relationshipStats.total_interactions || 0}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-studio-text-secondary">Conflicts:</span>
-                                <span>{relationshipStats.total_conflicts || 0}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-studio-text-secondary">Dynamic Changes:</span>
-                                <span>{relationshipStats.dynamic_changes || 0}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
             
