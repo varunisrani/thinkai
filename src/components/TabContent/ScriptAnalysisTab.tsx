@@ -860,63 +860,6 @@ const DepartmentAnalysis: React.FC<{scriptData: ScriptData | null}> = ({ scriptD
   );
 };
 
-const RawData: React.FC<{scriptData: ScriptData | null}> = ({ scriptData }) => {
-  if (!scriptData) {
-    return <NoDataMessage />;
-  }
-
-  // Extract key sections for better organization in the UI
-  const sections = [
-    { title: "Script Metadata", data: scriptData.metadata },
-    { title: "Scenes", data: scriptData.parsed_data.scenes },
-    { title: "Timeline", data: scriptData.parsed_data.timeline },
-    { title: "Validation Results", data: scriptData.validation },
-    { title: "Statistics", data: scriptData.statistics },
-    { title: "UI Metadata", data: scriptData.ui_metadata }
-  ];
-
-  return (
-    <DataSection title="Raw Data">
-      <div className="space-y-4">
-        <div className="bg-studio-blue/50 p-4 rounded-lg mb-4">
-          <h3 className="text-lg font-medium mb-3">Script Data Overview</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-studio-blue/30 p-3 rounded">
-              <div className="text-sm text-studio-text-secondary">Total Scenes</div>
-              <div className="text-lg font-medium">{scriptData.statistics?.total_scenes || scriptData.parsed_data.scenes.length}</div>
-            </div>
-            <div className="bg-studio-blue/30 p-3 rounded">
-              <div className="text-sm text-studio-text-secondary">Validation Status</div>
-              <div className={`text-lg font-medium ${scriptData.validation?.is_valid ? "text-studio-success" : "text-studio-warning"}`}>
-                {scriptData.validation?.is_valid ? "Valid" : "Invalid"}
-              </div>
-            </div>
-            <div className="bg-studio-blue/30 p-3 rounded">
-              <div className="text-sm text-studio-text-secondary">Analysis Date</div>
-              <div className="text-lg font-medium">{scriptData.metadata?.timestamp || "Unknown"}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {sections.map((section, index) => (
-            <div key={index} className="bg-studio-dark-blue rounded-md">
-              <div className="p-3 border-b border-studio-border">
-                <h4 className="font-medium text-studio-accent">{section.title}</h4>
-              </div>
-              <div className="p-4 overflow-x-auto max-h-64 scrollbar-thin scrollbar-thumb-studio-border scrollbar-track-studio-dark-blue">
-                <pre className="whitespace-pre-wrap text-sm text-studio-text-secondary">
-                  {JSON.stringify(section.data, null, 2)}
-                </pre>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </DataSection>
-  );
-};
-
 const ScriptAnalysisTab: React.FC = () => {
   const [activeSubtab, setActiveSubtab] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -931,8 +874,7 @@ const ScriptAnalysisTab: React.FC = () => {
     { icon: History, label: 'Timeline' },
     { icon: FileSearch, label: 'Scene Analysis' },
     { icon: BarChart2, label: 'Technical Requirements' },
-    { icon: Users, label: 'Department Analysis' },
-    { icon: Database, label: 'Raw Data' }
+    { icon: Users, label: 'Department Analysis' }
   ];
 
   useEffect(() => {
@@ -980,8 +922,7 @@ const ScriptAnalysisTab: React.FC = () => {
       0: () => <TimelineAnalysis scriptData={scriptData} />,
       1: () => <SceneAnalysis scriptData={scriptData} />,
       2: () => <TechnicalRequirements scriptData={scriptData} />,
-      3: () => <DepartmentAnalysis scriptData={scriptData} />,
-      4: () => <RawData scriptData={scriptData} />
+      3: () => <DepartmentAnalysis scriptData={scriptData} />
     };
 
     return components[activeSubtab as keyof typeof components]?.();

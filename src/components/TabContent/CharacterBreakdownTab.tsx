@@ -558,8 +558,7 @@ const CharacterBreakdownTab: React.FC = () => {
     { icon: Users, label: 'Character Profiles' },
     { icon: ArrowsUpDown, label: 'Arc & Relationships' },
     { icon: Grid, label: 'Scene Matrix' },
-    { icon: BarChart2, label: 'Statistics' },
-    { icon: Database, label: 'Raw Data' }
+    { icon: BarChart2, label: 'Statistics' }
   ];
 
   const handleGenerateAnalysis = async () => {
@@ -648,6 +647,13 @@ const CharacterBreakdownTab: React.FC = () => {
       </div>
     );
   }
+
+  const components = {
+    0: () => <TimelineAnalysis scriptData={scriptData} />,
+    1: () => <SceneAnalysis scriptData={scriptData} />,
+    2: () => <TechnicalRequirements scriptData={scriptData} />,
+    3: () => <DepartmentAnalysis scriptData={scriptData} />
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -994,17 +1000,6 @@ const CharacterBreakdownTab: React.FC = () => {
                       })}
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-            
-            {activeSubtab === 4 && (
-              <div className="studio-section animate-fade-in">
-                <h3 className="text-xl font-medium mb-4">Raw Character Data</h3>
-                <div className="bg-studio-dark-blue rounded-md p-4 font-mono text-sm text-studio-text-secondary overflow-x-auto">
-                  <pre className="whitespace-pre-wrap">
-                    {JSON.stringify(characterData, null, 2)}
-                  </pre>
                 </div>
               </div>
             )}
