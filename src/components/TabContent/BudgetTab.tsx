@@ -575,75 +575,6 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
           
           <div className="flex items-center space-x-4">
             <div className="flex space-x-2">
-              <button
-                onClick={() => setActiveTab('summary')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'summary' 
-                    ? 'bg-studio-accent text-white' 
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Summary
-              </button>
-              <button
-                onClick={() => setActiveTab('locations')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'locations'
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Locations
-              </button>
-              <button
-                onClick={() => setActiveTab('equipment')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'equipment'
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Equipment
-              </button>
-              <button
-                onClick={() => setActiveTab('personnel')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'personnel'
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Personnel
-              </button>
-              <button
-                onClick={() => setActiveTab('logistics')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'logistics'
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Logistics
-              </button>
-              <button
-                onClick={() => setActiveTab('insurance')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'insurance'
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Insurance
-              </button>
-            </div>
-          
-          <div className="flex space-x-2">
               <button 
                 onClick={() => setShowSettings(true)}
                 className="flex items-center px-3 py-1.5 rounded-md bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60"
@@ -658,7 +589,7 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
               >
                 <RefreshCw className="h-4 w-4 mr-1" />
                 {loading ? 'Regenerating...' : 'Regenerate'}
-            </button>
+              </button>
               <button 
                 onClick={() => {
                   const jsonStr = JSON.stringify(budgetData, null, 2);
@@ -676,7 +607,7 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
               >
                 <Download className="h-4 w-4 mr-1" />
                 Export
-            </button>
+              </button>
             </div>
           </div>
         </div>
@@ -686,53 +617,8 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
             {error}
           </div>
         )}
-        
-        {/* Budget Summary Cards - Always visible */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="studio-section flex items-center">
-            <div className="h-12 w-12 rounded-full bg-studio-highlight/20 flex items-center justify-center text-studio-highlight mr-4">
-              <DollarSign className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-studio-text-secondary text-sm">Total Budget</p>
-              <p className="text-xl font-semibold text-studio-text-primary">
-                {formatCurrency(totalBudget)}
-              </p>
-            </div>
-          </div>
-          
-          <div className="studio-section flex items-center">
-            <div className="h-12 w-12 rounded-full bg-studio-accent/20 flex items-center justify-center text-studio-accent mr-4">
-              <ArrowDown className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-studio-text-secondary text-sm">Allocated</p>
-              <p className="text-xl font-semibold text-studio-text-primary">
-                {formatCurrency(allocatedBudget)}
-                <span className="text-sm text-studio-text-secondary ml-1">
-                  ({calculatePercentage(allocatedBudget, totalBudget)}%)
-                </span>
-              </p>
-            </div>
-          </div>
-          
-          <div className="studio-section flex items-center">
-            <div className="h-12 w-12 rounded-full bg-studio-success/20 flex items-center justify-center text-studio-success mr-4">
-              <ArrowUp className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-studio-text-secondary text-sm">Remaining</p>
-              <p className="text-xl font-semibold text-studio-text-primary">
-                {formatCurrency(remainingBudget)}
-                <span className="text-sm text-studio-text-secondary ml-1">
-                  ({calculatePercentage(remainingBudget, totalBudget)}%)
-                </span>
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation - Single unified navigation */}
         <div className="flex space-x-1 mb-6 border-b border-studio-border">
           <button
             onClick={() => setActiveTab('summary')}
@@ -806,24 +692,72 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
         <div className="studio-section">
           {activeTab === 'summary' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-studio-blue/40 p-4 rounded-lg">
-                  <p className="text-sm text-studio-text-secondary">Total Days</p>
-                  <p className="text-xl font-semibold">{budgetResponse?.summary?.total_days ?? 0}</p>
+              {/* Budget Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-studio-blue/40 p-6 rounded-lg">
+                  <h3 className="text-lg font-medium mb-4">Location Costs Overview</h3>
+                  <div className="space-y-3">
+                    {Object.entries(budgetResponse?.location_costs || {}).map(([location, data]) => (
+                      <div key={location} className="flex justify-between text-sm">
+                        <span>{location}</span>
+                        <span>{formatCurrency((data as BudgetCostBreakdown).total_cost)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="bg-studio-blue/40 p-4 rounded-lg">
-                  <p className="text-sm text-studio-text-secondary">Locations</p>
-                  <p className="text-xl font-semibold">
-                    {(budgetResponse as BudgetData)?.summary?.total_locations ?? 0}
-                  </p>
+
+                <div className="bg-studio-blue/40 p-6 rounded-lg">
+                  <h3 className="text-lg font-medium mb-4">Equipment Costs Overview</h3>
+                  <div className="space-y-3">
+                    {Object.entries(budgetResponse?.equipment_costs || {}).map(([category, data]) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex justify-between font-medium">
+                          <span>{category}</span>
+                          <span>{formatCurrency((data as BudgetCostBreakdown).total_cost)}</span>
+                        </div>
+                        {(data as BudgetCostBreakdown).items && (
+                          <div className="text-xs text-studio-text-secondary">
+                            Items: {(data as BudgetCostBreakdown).items?.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="bg-studio-blue/40 p-4 rounded-lg">
-                  <p className="text-sm text-studio-text-secondary">Crew Size</p>
-                  <p className="text-xl font-semibold">{budgetResponse?.summary?.total_crew ?? 0}</p>
+              </div>
+
+              {/* Logistics & Insurance */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-studio-blue/40 p-6 rounded-lg">
+                  <h3 className="text-lg font-medium mb-4">Logistics Overview</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Transportation</span>
+                      <span>{formatCurrency(budgetResponse?.logistics_costs?.transportation?.rental_vehicle || 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Accommodation</span>
+                      <span>{formatCurrency(budgetResponse?.logistics_costs?.accommodation?.hotel || 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Catering</span>
+                      <span>{formatCurrency(budgetResponse?.logistics_costs?.catering?.meal_service || 0)}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-studio-blue/40 p-4 rounded-lg">
-                  <p className="text-sm text-studio-text-secondary">Cost per Day</p>
-                  <p className="text-xl font-semibold">{formatCurrency(budgetResponse?.summary?.cost_per_day ?? 0)}</p>
+
+                <div className="bg-studio-blue/40 p-6 rounded-lg">
+                  <h3 className="text-lg font-medium mb-4">Insurance & Contingency</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span>Insurance Coverage</span>
+                      <span>{formatCurrency(budgetResponse?.insurance_costs?.type || 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Contingency ({budgetResponse?.contingency?.percentage}%)</span>
+                      <span>{formatCurrency(budgetResponse?.contingency?.amount || 0)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -833,31 +767,31 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span>Total Location Costs</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.total_location_costs ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.total_location_costs || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Total Equipment Costs</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.total_equipment_costs ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.total_equipment_costs || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Total Personnel Costs</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.total_personnel_costs ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.total_personnel_costs || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Total Logistics Costs</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.total_logistics_costs ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.total_logistics_costs || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Total Insurance Costs</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.total_insurance_costs ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.total_insurance_costs || 0)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Contingency Amount</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.contingency_amount ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.contingency_amount || 0)}</span>
                   </div>
                   <div className="flex justify-between font-medium text-lg mt-4 pt-4 border-t border-studio-border">
                     <span>Grand Total</span>
-                    <span>{formatCurrency((budgetResponse as BudgetData).total_estimates?.grand_total ?? 0)}</span>
+                    <span>{formatCurrency(budgetResponse?.total_estimates?.grand_total || 0)}</span>
                   </div>
                 </div>
               </div>
@@ -866,30 +800,32 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
 
           {activeTab === 'locations' && (
             <div className="space-y-4">
-              {Object.entries(getBudgetSectionData(budgetResponse.location_costs)).map(([location, data]) => (
+              {Object.entries(budgetResponse?.location_costs || {}).map(([location, data]) => (
                 <div key={location} className="bg-studio-blue/40 p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">{location}</h4>
-                    <span>{formatCurrency(data.total_cost)}</span>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-medium text-lg">{location}</h4>
+                    <span className="text-xl font-semibold">{formatCurrency((data as BudgetCostBreakdown).total_cost)}</span>
                   </div>
-                  <div className="space-y-2 mt-2">
-                    <div className="flex justify-between text-sm text-studio-text-secondary">
-                      <span>Daily Rate</span>
-                      <span>{formatCurrency(data.daily_rate ?? 0)}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="text-sm">
+                        <span className="text-studio-text-secondary">Daily Rate:</span>
+                        <span className="ml-2">{formatCurrency((data as BudgetCostBreakdown).daily_rate || 0)}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-studio-text-secondary">Permit Costs:</span>
+                        <span className="ml-2">{formatCurrency((data as BudgetCostBreakdown).permit_costs || 0)}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-studio-text-secondary">Total Days:</span>
+                        <span className="ml-2">{(data as BudgetCostBreakdown).total_days || 0}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm text-studio-text-secondary">
-                      <span>Permit Costs</span>
-                      <span>{formatCurrency(data.permit_costs ?? 0)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-studio-text-secondary">
-                      <span>Total Days</span>
-                      <span>{data.total_days ?? 0}</span>
-                    </div>
-                    {data.additional_fees && data.additional_fees.length > 0 && (
-                      <div className="text-sm text-studio-text-secondary">
-                        <span>Additional Fees:</span>
-                        <ul className="list-disc list-inside mt-1">
-                          {data.additional_fees.map((fee, index) => (
+                    {(data as BudgetCostBreakdown).additional_fees && (
+                      <div>
+                        <p className="text-sm text-studio-text-secondary mb-1">Additional Fees:</p>
+                        <ul className="list-disc list-inside text-sm">
+                          {(data as BudgetCostBreakdown).additional_fees?.map((fee, index) => (
                             <li key={index}>{fee}</li>
                           ))}
                         </ul>
@@ -903,40 +839,42 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
 
           {activeTab === 'equipment' && (
             <div className="space-y-4">
-              {Object.entries(getBudgetSectionData(budgetResponse.equipment_costs)).map(([category, data]) => (
+              {Object.entries(budgetResponse?.equipment_costs || {}).map(([category, data]) => (
                 <div key={category} className="bg-studio-blue/40 p-4 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">{category}</h4>
-                    <span>{formatCurrency(data.total_cost)}</span>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-medium text-lg">{category}</h4>
+                    <span className="text-xl font-semibold">{formatCurrency((data as BudgetCostBreakdown).total_cost)}</span>
                   </div>
-                  <div className="space-y-2 mt-2">
-                    {data.items && (
-                      <div className="text-sm text-studio-text-secondary">
-                        <span>Items:</span>
-                        <ul className="list-disc list-inside mt-1">
-                          {data.items.map((item, index) => (
-                            <li key={index}>{item}</li>
+                  <div className="space-y-4">
+                    {(data as BudgetCostBreakdown).items && (
+                      <div>
+                        <p className="text-sm text-studio-text-secondary mb-1">Items:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(data as BudgetCostBreakdown).items?.map((item, index) => (
+                            <span key={index} className="px-2 py-1 bg-studio-blue/30 rounded text-sm">
+                              {item}
+                            </span>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     )}
-                    {data.rental_rates && Object.entries(data.rental_rates).length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-sm text-studio-text-secondary">Rental Rates:</span>
-                        <div className="space-y-1 mt-1">
-                          {Object.entries(data.rental_rates).map(([item, rate]) => (
-                            <div key={item} className="flex justify-between text-sm text-studio-text-secondary">
-                              <span>{item}</span>
+                    {(data as BudgetCostBreakdown).rental_rates && (
+                      <div>
+                        <p className="text-sm text-studio-text-secondary mb-1">Rental Rates:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.entries((data as BudgetCostBreakdown).rental_rates || {}).map(([item, rate]) => (
+                            <div key={item} className="flex justify-between text-sm">
+                              <span>{item}:</span>
                               <span>{formatCurrency(rate)}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-                    {data.insurance_costs && (
-                      <div className="flex justify-between text-sm text-studio-text-secondary">
-                        <span>Insurance Costs</span>
-                        <span>{formatCurrency(data.insurance_costs)}</span>
+                    {(data as BudgetCostBreakdown).insurance_costs && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-studio-text-secondary">Insurance:</span>
+                        <span>{formatCurrency((data as BudgetCostBreakdown).insurance_costs)}</span>
                       </div>
                     )}
                   </div>

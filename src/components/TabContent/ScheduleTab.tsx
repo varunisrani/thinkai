@@ -31,7 +31,10 @@ interface ScheduleParams {
     validation: {
       validation_report: {
         technical_validation: {
-          department_conflicts: any[];
+          department_conflicts: {
+            scene_number: string;
+            conflict: string;
+          }[];
         };
       };
     };
