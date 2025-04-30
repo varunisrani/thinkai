@@ -533,13 +533,36 @@ const ScheduleTab: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {scheduleData.location_plan.locations.map((location) => (
               <div key={location.id} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                <h4 className="font-medium mb-2">{location.name}</h4>
-                <div className="space-y-2 text-sm">
-                  <p><span className="text-studio-text-secondary">Address:</span> {location.address}</p>
-                  <p><span className="text-studio-text-secondary">Setup Time:</span> {location.setup_time_minutes} minutes</p>
-                  <p><span className="text-studio-text-secondary">Wrap Time:</span> {location.wrap_time_minutes} minutes</p>
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="font-medium text-lg">{location.name}</h4>
+                  <span className="px-2 py-1 bg-studio-blue/30 rounded text-xs">ID: {location.id}</span>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Basic Info */}
                   <div>
-                    <p className="text-studio-text-secondary mb-1">Requirements:</p>
+                    <p className="text-sm"><span className="text-studio-text-secondary">Address:</span> {location.address}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <p className="text-sm"><span className="text-studio-text-secondary">Setup:</span> {location.setup_time_minutes}min</p>
+                      <p className="text-sm"><span className="text-studio-text-secondary">Wrap:</span> {location.wrap_time_minutes}min</p>
+                    </div>
+                  </div>
+
+                  {/* Scenes */}
+                  <div>
+                    <p className="text-sm font-medium text-studio-text-secondary mb-1">Scenes:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {location.scenes.map((scene, i) => (
+                        <span key={i} className="bg-studio-accent/20 px-2 py-0.5 rounded text-xs">
+                          Scene {scene}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Requirements */}
+                  <div>
+                    <p className="text-sm font-medium text-studio-text-secondary mb-1">Requirements:</p>
                     <div className="flex flex-wrap gap-1">
                       {location.requirements.map((req, i) => (
                         <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
@@ -548,6 +571,35 @@ const ScheduleTab: React.FC = () => {
                       ))}
                     </div>
                   </div>
+
+                  {/* Weather Dependencies */}
+                  {scheduleData.location_plan.weather_dependencies[location.id] && (
+                    <div className="border-t border-studio-border pt-3 mt-3">
+                      <p className="text-sm font-medium text-studio-text-secondary mb-2">Weather Conditions:</p>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-studio-text-secondary mb-1">Preferred:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {scheduleData.location_plan.weather_dependencies[location.id].preferred_conditions.map((condition, i) => (
+                              <span key={i} className="bg-studio-success/20 px-2 py-0.5 rounded text-xs">
+                                {condition}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-studio-text-secondary mb-1">Avoid:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {scheduleData.location_plan.weather_dependencies[location.id].avoid_conditions.map((condition, i) => (
+                              <span key={i} className="bg-studio-warning/20 px-2 py-0.5 rounded text-xs">
+                                {condition}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -556,62 +608,67 @@ const ScheduleTab: React.FC = () => {
 
         {/* Location Groups */}
         <div className="studio-section">
-          <h3 className="text-xl font-medium mb-4">Location Groups</h3>
+          <h3 className="text-xl font-medium mb-4">Location Groups & Dependencies</h3>
           <div className="space-y-4">
             {scheduleData.location_plan.location_groups.map((group) => (
               <div key={group.group_id} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Group {group.group_id}</h4>
-                <p className="text-sm mb-2">{group.reason}</p>
-                <div className="flex flex-wrap gap-2">
-                  {group.locations.map((locId) => (
-                    <span key={locId} className="bg-studio-blue/30 px-2 py-1 rounded text-sm">
-                      {locId}
-                    </span>
-                  ))}
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="font-medium">Group {group.group_id}</h4>
+                  <span className="px-2 py-1 bg-studio-blue/30 rounded text-xs">
+                    {group.locations.length} locations
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-studio-text-secondary mb-1">Grouping Reason:</p>
+                    <p className="text-sm bg-studio-blue/30 p-2 rounded">{group.reason}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-studio-text-secondary mb-1">Locations in Group:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {group.locations.map((locId) => {
+                        const location = scheduleData.location_plan.locations.find(l => l.id === locId);
+                        return (
+                          <span key={locId} className="bg-studio-accent/20 px-2 py-1 rounded text-sm flex items-center">
+                            <span className="text-xs text-studio-text-secondary mr-1">{locId}:</span>
+                            {location?.name || locId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Weather Dependencies */}
+        {/* Seasonal Notes */}
         <div className="studio-section">
-          <h3 className="text-xl font-medium mb-4">Weather Dependencies</h3>
+          <h3 className="text-xl font-medium mb-4">Seasonal Considerations</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Object.entries(scheduleData.location_plan.weather_dependencies).map(([locId, weather]) => (
-              <div key={locId} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Location {locId}</h4>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-sm text-studio-text-secondary mb-1">Preferred Conditions:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {weather.preferred_conditions.map((condition, i) => (
-                        <span key={i} className="bg-studio-success/20 px-2 py-0.5 rounded text-xs">
-                          {condition}
-                        </span>
-                      ))}
-                    </div>
+              weather.seasonal_notes.length > 0 && (
+                <div key={locId} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-medium">
+                      {scheduleData.location_plan.locations.find(l => l.id === locId)?.name || locId}
+                    </h4>
                   </div>
                   <div>
-                    <p className="text-sm text-studio-text-secondary mb-1">Avoid Conditions:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {weather.avoid_conditions.map((condition, i) => (
-                        <span key={i} className="bg-studio-warning/20 px-2 py-0.5 rounded text-xs">
-                          {condition}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-studio-text-secondary mb-1">Seasonal Notes:</p>
-                    <ul className="list-disc list-inside text-xs">
+                    <p className="text-sm font-medium text-studio-text-secondary mb-2">Seasonal Notes:</p>
+                    <ul className="list-disc list-inside space-y-1">
                       {weather.seasonal_notes.map((note, i) => (
-                        <li key={i}>{note}</li>
+                        <li key={i} className="text-sm text-studio-text-primary">
+                          {note}
+                        </li>
                       ))}
                     </ul>
                   </div>
                 </div>
-              </div>
+              )
             ))}
           </div>
         </div>
