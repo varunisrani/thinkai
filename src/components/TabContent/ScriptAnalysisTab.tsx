@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Timeline, FileSearch, BarChart2, Users, Database } from 'lucide-react';
+import { History, FileSearch, BarChart2, Users, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SubtabProps {
@@ -47,7 +47,7 @@ const ScriptAnalysisTab: React.FC = () => {
   const [activeSubtab, setActiveSubtab] = useState(0);
   
   const subtabs = [
-    { icon: Timeline, label: 'Timeline' },
+    { icon: History, label: 'Timeline' },
     { icon: FileSearch, label: 'Scene Analysis' },
     { icon: BarChart2, label: 'Technical Requirements' },
     { icon: Users, label: 'Department Analysis' },
