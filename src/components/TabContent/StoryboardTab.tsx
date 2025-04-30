@@ -337,13 +337,16 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
     try {
       logDebug('Generating full storyboard');
       
+      // Create proper payload structure with scenario_results
+      const apiPayload = {
+        scenario_results: scriptData, // This was previously script_results: scriptData
+        shot_settings: storyboardSettings.shot_settings
+      };
+      
       const response = await fetch(`https://varun324242-sjuu.hf.space/api/storyboard/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          script_results: scriptData,
-          shot_settings: storyboardSettings.shot_settings
-        }),
+        body: JSON.stringify(apiPayload),
       });
 
       if (!response.ok) {

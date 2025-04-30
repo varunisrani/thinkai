@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, PieChart, ArrowDown, ArrowUp, 
   ChevronDown, ChevronUp, Download, Settings,
-  RefreshCw, AlertCircle, Sliders, Users, Wrench as Tool,
+  RefreshCw, AlertCircle, Sliders, Users,
   MapPin, Truck, Shield
 } from 'lucide-react';
 import { useScriptData } from '@/hooks/useScriptData';
@@ -151,7 +151,7 @@ const defaultBudgetData: BudgetData = {
   }
 };
 
-type BudgetTabSection = 'summary' | 'locations' | 'equipment' | 'personnel' | 'logistics' | 'insurance' | 'optimization';
+type BudgetTabSection = 'summary' | 'locations' | 'equipment' | 'personnel' | 'logistics' | 'insurance';
 
 const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
   const { 
@@ -358,86 +358,6 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
     } finally {
       setLoading(false);
       logDebug('Budget generation completed');
-    }
-  };
-
-  const handleOptimizeBudget = async (scenario: string) => {
-    if (!budgetData) {
-      console.warn('No budget data available for optimization');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Prepare scenario constraints
-      const scenarioConstraints = {
-        quality_impact_tolerance: 0.5, // 50%
-        timeline_flexibility: 5, // 5 days
-        risk_tolerance: "medium",
-        original_constraints: {
-          quality_level: budgetQualityLevel,
-          equipment_preference: equipmentPreference,
-          crew_size: crewSize
-        }
-      };
-
-      const requestBody = {
-        scenario_constraints: scenarioConstraints,
-        scenario: scenario
-      };
-
-      console.group('Budget Optimization - API Request');
-      console.log('Endpoint:', `${API_BASE_URL}/budget/optimize`);
-      console.log('Scenario:', scenario);
-      console.log('Request Body:', requestBody);
-      console.groupEnd();
-
-      logDebug('Making optimization request:', requestBody);
-
-      const response = await fetch(`${API_BASE_URL}/budget/optimize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.group('Budget Optimization - API Response');
-      console.log('Status:', response.status);
-      console.log('Status Text:', response.statusText);
-      console.log('Headers:', Object.fromEntries(response.headers.entries()));
-      console.groupEnd();
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.group('Budget Optimization - Response Data');
-      console.log('Success:', result.success);
-      console.log('Data:', result.data);
-      if (!result.success) console.error('Error:', result.error);
-      console.groupEnd();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Unknown API error');
-      }
-
-      // Update budget data with scenario results
-      const updatedBudgetData = {
-        ...budgetData,
-        scenario_results: result.data
-      };
-
-      console.log('Updating budget data with optimization results:', updatedBudgetData);
-      updateBudgetData(updatedBudgetData);
-
-      toast.success('Budget optimization completed!');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to optimize budget';
-      console.error('Budget optimization error:', err);
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -721,17 +641,6 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
               >
                 Insurance
               </button>
-              <button
-                onClick={() => setActiveTab('optimization')}
-                className={cn(
-                  'px-3 py-1.5 rounded-md text-sm font-medium',
-                  activeTab === 'optimization'
-                    ? 'bg-studio-accent text-white'
-                    : 'bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60'
-                )}
-              >
-                Optimization
-              </button>
             </div>
           
           <div className="flex space-x-2">
@@ -890,17 +799,6 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
             )}
           >
             Insurance
-          </button>
-          <button
-            onClick={() => setActiveTab('optimization')}
-            className={cn(
-              'px-4 py-2 text-sm font-medium rounded-t-lg',
-              activeTab === 'optimization'
-                ? 'bg-studio-accent text-white'
-                : 'text-studio-text-secondary hover:bg-studio-blue/20'
-            )}
-          >
-            Optimization
           </button>
         </div>
 
@@ -1133,88 +1031,6 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
                   <span>{formatCurrency(budgetResponse?.contingency?.amount ?? 0)}</span>
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'optimization' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => handleOptimizeBudget('cost_reduction')}
-                  className="p-4 bg-studio-blue/40 rounded-lg hover:bg-studio-blue/60 transition-colors"
-                >
-                  <DollarSign className="h-8 w-8 mb-2 text-studio-accent" />
-                  <h4 className="font-medium mb-1">Cost Reduction</h4>
-                  <p className="text-sm text-studio-text-secondary">
-                    Find areas to reduce costs while minimizing impact
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => handleOptimizeBudget('quality_improvement')}
-                  className="p-4 bg-studio-blue/40 rounded-lg hover:bg-studio-blue/60 transition-colors"
-                >
-                  <Tool className="h-8 w-8 mb-2 text-studio-accent" />
-                  <h4 className="font-medium mb-1">Quality Improvement</h4>
-                  <p className="text-sm text-studio-text-secondary">
-                    Optimize budget allocation for better quality
-                  </p>
-                </button>
-
-                <button
-                  onClick={() => handleOptimizeBudget('resource_efficiency')}
-                  className="p-4 bg-studio-blue/40 rounded-lg hover:bg-studio-blue/60 transition-colors"
-                >
-                  <Users className="h-8 w-8 mb-2 text-studio-accent" />
-                  <h4 className="font-medium mb-1">Resource Efficiency</h4>
-                  <p className="text-sm text-studio-text-secondary">
-                    Improve resource allocation and utilization
-                  </p>
-                </button>
-              </div>
-
-              {(budgetData as unknown as BudgetData).scenario_results && (
-                <div>
-                  <h3 className="text-xl font-medium mb-4">Optimization Results</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                        <h4 className="font-medium mb-2">Cost Savings</h4>
-                        <p className="text-2xl font-semibold text-studio-accent">
-                          {formatCurrency((budgetData as unknown as BudgetData).scenario_results.cost_savings)}
-                        </p>
-                      </div>
-                      <div className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                        <h4 className="font-medium mb-2">Quality Impact</h4>
-                        <p className="text-2xl font-semibold text-studio-accent">
-                          {(budgetData as unknown as BudgetData).scenario_results.quality_impact}%
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
-                      <h4 className="font-medium mb-4">Recommendations</h4>
-                      <div className="space-y-3">
-                        {(budgetData as unknown as BudgetData).scenario_results.recommendations.map((rec, index) => (
-                          <div key={index} className="bg-studio-blue/20 p-3 rounded-lg">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="font-medium">{rec.category}</span>
-                              <div className="text-right">
-                                <span className="text-sm text-studio-text-secondary">Impact:</span>
-                                <div>
-                                  <span className="text-studio-accent">{formatCurrency(rec.impact.cost)}</span>
-                                  <span className="text-studio-text-secondary mx-1">|</span>
-                                  <span className="text-studio-success">{rec.impact.quality}%</span>
-                                </div>
-                              </div>
-                            </div>
-                            <p className="text-sm text-studio-text-secondary">{rec.action}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
