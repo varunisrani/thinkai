@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Calendar, List, MapPin, Users, Calendar as CalendarIcon, 
   FileText, ChartGantt, FilePieChart, Database, ChevronLeft, ChevronRight,
-  Wrench, Clock, Briefcase
+  Wrench, Clock, Briefcase, Loader2, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -180,7 +180,9 @@ const ScheduleTab: React.FC = () => {
   const { scriptData, characterData, scheduleData, updateScheduleData } = useScriptData();
   const [activeSubtab, setActiveSubtab] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   // Define all available subtabs
   const subtabs = [
@@ -236,16 +238,15 @@ const ScheduleTab: React.FC = () => {
 
   const handleGenerateSchedule = async () => {
     if (!scriptData || !characterData) {
-      logDebug('Generate schedule failed - Missing required data', {
-        hasScriptData: !!scriptData,
-        hasCharacterData: !!characterData
-      });
       toast.error('Please complete script analysis and character breakdown first');
       return;
     }
 
-    logDebug('Starting schedule generation...');
+    const isRegeneration = !!scheduleData;
     setLoading(true);
+    if (isRegeneration) {
+      setIsRegenerating(true);
+    }
     setError(null);
 
     try {
@@ -277,20 +278,12 @@ const ScheduleTab: React.FC = () => {
         }
       };
 
-      logDebug('Making API request with params:', params);
-
       // First try the API
       try {
         const response = await fetch(`${API_URL}/schedule`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(params),
-        });
-
-        logDebug('API response received:', {
-          status: response.status,
-          ok: response.ok,
-          contentType: response.headers.get('content-type')
         });
 
         if (!response.ok) {
@@ -303,40 +296,53 @@ const ScheduleTab: React.FC = () => {
         }
 
         const result = await response.json();
-        logDebug('API result:', result);
 
         if (!result.success) {
           throw new Error(result.error || 'Unknown API error');
         }
 
-        // Make sure data is saved to localStorage properly
-        logDebug('Saving schedule data to localStorage and context');
-        saveToStorage('SCHEDULE_DATA', result.data);
-        updateScheduleData(result.data);
-        toast.success('Schedule generated successfully!');
+        // Force a re-render if regenerating
+        if (isRegeneration) {
+          // Clear data first
+          updateScheduleData(null);
+          
+          // Wait for a tick to ensure UI updates
+          await new Promise(resolve => setTimeout(resolve, 0));
+          
+          // Update storage and data
+          saveToStorage('SCHEDULE_DATA', result.data);
+          updateScheduleData(result.data);
+          
+          // Force component update
+          setForceUpdate(prev => prev + 1);
+        } else {
+          saveToStorage('SCHEDULE_DATA', result.data);
+          updateScheduleData(result.data);
+        }
+
+        toast.success(isRegeneration ? 'Schedule regenerated successfully!' : 'Schedule generated successfully!');
 
       } catch (apiError) {
-        logDebug('API call failed:', apiError);
         // Try loading from storage as fallback
         const storedData = loadFromStorage<ScheduleData>('SCHEDULE_DATA');
         if (storedData) {
-          logDebug('Found backup data in localStorage');
           updateScheduleData(storedData);
           toast.success('Loaded schedule from local storage');
         } else {
-          logDebug('No backup data found in localStorage');
           throw new Error('Failed to generate or load schedule');
         }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate schedule';
-      logDebug('Error during schedule generation:', err);
       console.error('Schedule generation error:', err);
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
-      logDebug('Schedule generation completed');
+      // Add a small delay before removing regeneration state
+      setTimeout(() => {
+        setIsRegenerating(false);
+      }, 500); // Small delay to ensure smooth transition
     }
   };
 
@@ -390,7 +396,15 @@ const ScheduleTab: React.FC = () => {
 
   const renderCalendarView = () => {
     return (
-      <div className="animate-fade-in">
+      <div className="animate-fade-in relative">
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+              <p className="text-sm text-studio-text-secondary">Updating calendar view...</p>
+            </div>
+          </div>
+        )}
         <div className="p-6">
           <div className="mb-4 flex justify-between items-center">
             <button 
@@ -490,35 +504,45 @@ const ScheduleTab: React.FC = () => {
 
   const renderScheduleList = () => {
     return (
-      <div className="p-6 animate-fade-in">
-        <div className="studio-section">
-          <h3 className="text-xl font-medium mb-4">Schedule List</h3>
-          <div className="space-y-4">
-            {scheduleData.schedule?.map((day, index) => (
-              <div key={index} className="p-4 bg-studio-blue/40 border border-studio-border rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center">
-                    <CalendarIcon className="h-4 w-4 mr-2 text-studio-accent" />
-                    <span className="font-medium">Day {index + 1} ({format(new Date(day.date), 'MMMM d, yyyy')})</span>
-                  </div>
-                  <span className="text-sm text-studio-text-secondary">8:00 AM - 6:00 PM</span>
-                </div>
-                <div className="space-y-2">
-                  {day.scenes.map((scene, sceneIndex) => (
-                    <div key={sceneIndex} className="p-2 bg-studio-blue/30 rounded flex justify-between">
-                      <div>
-                        <span className="text-studio-accent">Scene {scene.scene_id}</span>
-                        <span className="mx-2 text-studio-text-secondary">|</span>
-                        <span>{scene.location_id}</span>
-                      </div>
-                      <span className="text-sm text-studio-text-secondary">
-                        {scene.start_time} - {scene.end_time}
-                      </span>
+      <div className="p-6 animate-fade-in relative">
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+              <p className="text-sm text-studio-text-secondary">Updating schedule list...</p>
+            </div>
+          </div>
+        )}
+        <div className="p-6 animate-fade-in">
+          <div className="studio-section">
+            <h3 className="text-xl font-medium mb-4">Schedule List</h3>
+            <div className="space-y-4">
+              {scheduleData.schedule?.map((day, index) => (
+                <div key={index} className="p-4 bg-studio-blue/40 border border-studio-border rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center">
+                      <CalendarIcon className="h-4 w-4 mr-2 text-studio-accent" />
+                      <span className="font-medium">Day {index + 1} ({format(new Date(day.date), 'MMMM d, yyyy')})</span>
                     </div>
-                  ))}
+                    <span className="text-sm text-studio-text-secondary">8:00 AM - 6:00 PM</span>
+                  </div>
+                  <div className="space-y-2">
+                    {day.scenes.map((scene, sceneIndex) => (
+                      <div key={sceneIndex} className="p-2 bg-studio-blue/30 rounded flex justify-between">
+                        <div>
+                          <span className="text-studio-accent">Scene {scene.scene_id}</span>
+                          <span className="mx-2 text-studio-text-secondary">|</span>
+                          <span>{scene.location_id}</span>
+                        </div>
+                        <span className="text-sm text-studio-text-secondary">
+                          {scene.start_time} - {scene.end_time}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -529,7 +553,15 @@ const ScheduleTab: React.FC = () => {
     if (!scheduleData?.location_plan) return null;
     
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 relative">
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+              <p className="text-sm text-studio-text-secondary">Updating location plan...</p>
+            </div>
+          </div>
+        )}
         {/* Locations */}
         <div className="studio-section">
           <h3 className="text-xl font-medium mb-4">Locations</h3>
@@ -683,7 +715,15 @@ const ScheduleTab: React.FC = () => {
     if (!scheduleData?.crew_allocation) return null;
 
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 relative">
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+              <p className="text-sm text-studio-text-secondary">Updating crew allocation...</p>
+            </div>
+          </div>
+        )}
         {/* Crew Assignments */}
         <div className="studio-section">
           <h3 className="text-xl font-medium mb-4">Crew Assignments</h3>
@@ -778,7 +818,15 @@ const ScheduleTab: React.FC = () => {
     if (!scheduleData?.crew_allocation?.equipment_assignments) return null;
 
     return (
-      <div className="p-6">
+      <div className="p-6 relative">
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+              <p className="text-sm text-studio-text-secondary">Updating equipment assignments...</p>
+            </div>
+          </div>
+        )}
         <div className="studio-section">
           <h3 className="text-xl font-medium mb-4">Equipment Assignments</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -825,48 +873,58 @@ const ScheduleTab: React.FC = () => {
     if (!scheduleData?.gantt_data) return null;
 
     return (
-      <div className="p-6">
-        <div className="studio-section">
-          <h3 className="text-xl font-medium mb-4">Production Timeline</h3>
-          <div className="space-y-4">
-            {scheduleData.gantt_data.tasks.map((task: GanttTask) => (
-              <div 
-                key={task.id} 
-                className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg"
-                style={{ borderLeft: `4px solid ${task.color}` }}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-medium">{task.text}</h4>
-                  <span className="text-sm text-studio-text-secondary">
-                    {format(new Date(task.start_date), 'MMM d, HH:mm')} - 
-                    {format(new Date(task.end_date), 'HH:mm')}
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  {task.parent && (
-                    <p><span className="text-studio-text-secondary">Parent Task:</span> {task.parent}</p>
-                  )}
-                  {task.dependencies.length > 0 && (
-                    <div>
-                      <p className="text-studio-text-secondary mb-1">Dependencies:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {task.dependencies.map((dep, i) => (
-                          <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
-                            {dep}
-                          </span>
-                        ))}
+      <div className="p-6 relative">
+        {isRegenerating && (
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+              <p className="text-sm text-studio-text-secondary">Updating production timeline...</p>
+            </div>
+          </div>
+        )}
+        <div className="p-6">
+          <div className="studio-section">
+            <h3 className="text-xl font-medium mb-4">Production Timeline</h3>
+            <div className="space-y-4">
+              {scheduleData.gantt_data.tasks.map((task: GanttTask) => (
+                <div 
+                  key={task.id} 
+                  className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg"
+                  style={{ borderLeft: `4px solid ${task.color}` }}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium">{task.text}</h4>
+                    <span className="text-sm text-studio-text-secondary">
+                      {format(new Date(task.start_date), 'MMM d, HH:mm')} - 
+                      {format(new Date(task.end_date), 'HH:mm')}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {task.parent && (
+                      <p><span className="text-studio-text-secondary">Parent Task:</span> {task.parent}</p>
+                    )}
+                    {task.dependencies.length > 0 && (
+                      <div>
+                        <p className="text-studio-text-secondary mb-1">Dependencies:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {task.dependencies.map((dep, i) => (
+                            <span key={i} className="bg-studio-blue/30 px-2 py-0.5 rounded text-xs">
+                              {dep}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                    )}
+                    <div className="w-full bg-studio-blue/30 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-studio-accent h-full rounded-full"
+                        style={{ width: `${task.progress * 100}%` }}
+                      ></div>
                     </div>
-                  )}
-                  <div className="w-full bg-studio-blue/30 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-studio-accent h-full rounded-full"
-                      style={{ width: `${task.progress * 100}%` }}
-                    ></div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -877,16 +935,31 @@ const ScheduleTab: React.FC = () => {
     <div className="h-full flex flex-col">
       <div className="border-b border-studio-border p-4">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-studio-text-primary">
-            Production Schedule
-          </h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-studio-text-primary">
+              Production Schedule
+            </h2>
+            <p className="text-sm text-studio-text-secondary mt-1">
+              Plan and organize your production schedule efficiently.
+            </p>
+          </div>
           {scheduleData && (
             <button 
               onClick={handleGenerateSchedule}
-              disabled={loading}
-              className="px-4 py-2 bg-studio-accent text-white rounded-md hover:bg-studio-accent-dark disabled:opacity-50"
+              disabled={loading || isRegenerating}
+              className="flex items-center px-4 py-2 text-sm rounded-md bg-studio-accent hover:bg-studio-accent/90 disabled:bg-studio-accent/50 text-white"
             >
-              {loading ? 'Regenerating...' : 'Regenerate Schedule'}
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate
+                </>
+              )}
             </button>
           )}
         </div>
@@ -894,7 +967,7 @@ const ScheduleTab: React.FC = () => {
         <div className="flex overflow-x-auto pb-2">
           {subtabs.map((tab, index) => (
             <Subtab
-              key={index}
+              key={`${index}-${forceUpdate}`}
               active={activeSubtab === index}
               icon={tab.icon}
               label={tab.label}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Grid, BarChart2, Database, Loader2 } from 'lucide-react';
+import { Users, Grid, BarChart2, Database, Loader2, RefreshCw } from 'lucide-react';
 import { ArrowsUpDown } from '@/lib/icon-exports';
 import { cn } from '@/lib/utils';
 import { useScriptData } from '@/hooks/useScriptData';
@@ -30,15 +30,17 @@ interface CharacterObjectives {
   }>;
 }
 
-interface EmotionalRange {
+interface EmotionalJourney {
+  scene: string;
+  emotion: string;
+  intensity: number;
+  trigger: string;
+}
+
+interface CharacterEmotionalRange {
   primary_emotion?: string;
   emotional_spectrum?: string[];
-  emotional_journey?: Array<{
-    scene: string;
-    emotion: string;
-    intensity: number;
-    trigger: string;
-  }>;
+  emotional_journey?: EmotionalJourney[];
 }
 
 interface DialogueAnalysis {
@@ -103,16 +105,62 @@ interface Relationship {
   conflicts: string[];
 }
 
-interface EmotionalJourneyStep {
+interface EmotionalJourneyEntry {
   scene: string;
   emotion: string;
   intensity: number;
   trigger: string;
 }
 
+interface SceneMatrixData {
+  characters?: string[];
+  present_characters?: string[];
+  emotional_tone?: string;
+  emotional_atmosphere?: string;
+}
+
+interface EmotionalStats {
+  primary_emotion: string;
+  emotional_variety: number;
+  average_intensity: number;
+}
+
+interface TechnicalStats {
+  total_props: number;
+  unique_props: number;
+}
+
+interface MakeupStats {
+  total_changes: number;
+}
+
+interface CostumeStats {
+  total_changes: number;
+}
+
+interface Statistics {
+  scene_stats: {
+    total_scenes: number;
+    average_characters_per_scene: number;
+    total_interactions: number;
+  };
+  dialogue_stats: Record<string, DialogueStats>;
+  emotional_stats: Record<string, EmotionalStats>;
+  technical_stats: {
+    prop_usage: Record<string, { total_props: number; unique_props: number }>;
+    makeup_changes: Record<string, { total_changes: number }>;
+    costume_changes: Record<string, { total_changes: number }>;
+  };
+  relationship_stats: Record<string, {
+    total_interactions: number;
+    total_conflicts: number;
+    dynamic_changes: number;
+  }>;
+}
+
 interface Character {
   dialogue_analysis?: DialogueAnalysis;
-  emotional_range?: EmotionalRange;
+  emotional_range?: CharacterEmotionalRange;
   action_sequences?: ActionSequence[];
   scene_presence?: string[];
   objectives?: CharacterObjectives;
@@ -512,48 +560,9 @@ const CharacterBreakdownTab: React.FC = () => {
   const { scriptData, characterData, updateCharacterData } = useScriptData();
   const [activeSubtab, setActiveSubtab] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  // Log initial mount and data state
-  useEffect(() => {
-    logDebug('Component mounted');
-    logDebug('Initial state:', {
-      hasScriptData: !!scriptData,
-      hasCharacterData: !!characterData,
-      activeSubtab,
-      isLoading
-    });
-
-    // Check localStorage for existing data
-    const storedCharacterData = localStorage.getItem('CHARACTER_DATA');
-    logDebug('LocalStorage state:', {
-      CHARACTER_DATA: storedCharacterData ? 'Found' : 'Not found'
-    });
-
-    if (!characterData && storedCharacterData) {
-      logDebug('Found character data in localStorage, attempting to load');
-      try {
-        const parsedData = JSON.parse(storedCharacterData);
-        updateCharacterData(parsedData);
-        logDebug('Successfully loaded character data from localStorage');
-      } catch (err) {
-        logDebug('Error parsing character data from localStorage:', err);
-      }
-    }
-  }, []);
-
-  // Log data changes
-  useEffect(() => {
-    logDebug('Character data updated:', characterData);
-  }, [characterData]);
-
-  // Log subtab changes
-  useEffect(() => {
-    logDebug('Active subtab changed:', {
-      index: activeSubtab,
-      label: subtabs[activeSubtab].label
-    });
-  }, [activeSubtab]);
-
   const subtabs = [
     { icon: Users, label: 'Character Profiles' },
     { icon: ArrowsUpDown, label: 'Arc & Relationships' },
@@ -563,16 +572,17 @@ const CharacterBreakdownTab: React.FC = () => {
 
   const handleGenerateAnalysis = async () => {
     if (!scriptData) {
-      logDebug('Generate analysis failed - No script data available');
       toast.error('Please upload a script first');
       return;
     }
 
-    logDebug('Starting character analysis generation...');
+    const isRegeneration = !!characterData;
     setIsLoading(true);
-    
+    if (isRegeneration) {
+      setIsRegenerating(true);
+    }
+
     try {
-      logDebug('Making API request with script data');
       const response = await fetch(`${API_URL}/characters`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -582,100 +592,75 @@ const CharacterBreakdownTab: React.FC = () => {
       });
 
       const result = await response.json();
-      logDebug('API response received:', result);
-
       if (!result.success) {
         throw new Error(result.error);
       }
 
       // Save to localStorage
-      logDebug('Saving character data to localStorage');
       localStorage.setItem('CHARACTER_DATA', JSON.stringify(result.data));
-      
-      updateCharacterData(result.data);
-      logDebug('Character data updated successfully');
-      toast.success('Character analysis completed successfully!');
+
+      // Force a re-render if regenerating
+      if (isRegeneration) {
+        // Temporarily clear the data to force a re-render
+        updateCharacterData(null);
+        setTimeout(() => {
+          updateCharacterData(result.data);
+        }, 0);
+      } else {
+        updateCharacterData(result.data);
+      }
+
+      toast.success(isRegeneration ? 'Character analysis regenerated successfully!' : 'Character analysis completed successfully!');
     } catch (error) {
-      logDebug('Error during character analysis:', error);
-      console.error('Error analyzing characters:', error);
-      
-      // Try loading from localStorage as fallback
-      logDebug('Attempting to load from localStorage as fallback');
-      const storedData = localStorage.getItem('CHARACTER_DATA');
-      
-      if (storedData) {
-        try {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate analysis';
+      toast.error(errorMessage);
+
+      // Try to load from localStorage as fallback
+      try {
+        const storedData = localStorage.getItem('CHARACTER_DATA');
+        if (storedData) {
           const parsedData = JSON.parse(storedData);
-          logDebug('Found and loaded backup data from localStorage');
           updateCharacterData(parsedData);
           toast.success('Loaded character data from local storage');
-        } catch (parseError) {
-          logDebug('Failed to parse backup data from localStorage:', parseError);
-          toast.error('Failed to generate character analysis.');
         }
-      } else {
-        logDebug('No backup data found in localStorage');
-        toast.error('Failed to generate character analysis.');
+      } catch (storageError) {
+        console.error('Failed to load from localStorage:', storageError);
       }
     } finally {
       setIsLoading(false);
-      logDebug('Analysis generation completed');
+      setIsRegenerating(false);
     }
-  };
-
-  // Log render state
-  logDebug('Rendering with state:', {
-    hasScriptData: !!scriptData,
-    hasCharacterData: !!characterData,
-    activeSubtab,
-    isLoading
-  });
-
-  if (!scriptData) {
-    logDebug('No script data available, showing upload prompt');
-    return (
-      <div className="p-6">
-        <div className="text-center">
-          <h3 className="text-xl font-medium mb-4">Please upload a script first</h3>
-          <button 
-            onClick={() => window.history.back()}
-            className="px-4 py-2 bg-studio-blue text-white rounded-md hover:bg-studio-blue-dark"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const components = {
-    0: () => <TimelineAnalysis scriptData={scriptData} />,
-    1: () => <SceneAnalysis scriptData={scriptData} />,
-    2: () => <TechnicalRequirements scriptData={scriptData} />,
-    3: () => <DepartmentAnalysis scriptData={scriptData} />
   };
 
   return (
     <div className="h-full flex flex-col">
       <div className="border-b border-studio-border p-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-semibold text-studio-text-primary">
-            Character Breakdown
-          </h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-studio-text-primary">
+              Character Breakdown
+            </h2>
+            <p className="text-sm text-studio-text-secondary mt-1">
+              Analyze character relationships, arcs, and technical requirements.
+            </p>
+          </div>
           
           {characterData && (
             <button 
               onClick={handleGenerateAnalysis}
               disabled={isLoading}
-              className="flex items-center px-3 py-1 text-sm rounded-md bg-studio-blue hover:bg-studio-blue/70 text-studio-text-secondary"
+              className="flex items-center px-4 py-2 text-sm rounded-md bg-studio-accent hover:bg-studio-accent/90 disabled:bg-studio-accent/50 text-white"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Refreshing...
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating...
                 </>
               ) : (
-                'Refresh Analysis'
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate
+                </>
               )}
             </button>
           )}
@@ -700,7 +685,15 @@ const CharacterBreakdownTab: React.FC = () => {
         ) : (
           <>
             {activeSubtab === 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in relative">
+                {isRegenerating && (
+                  <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                      <p className="text-sm text-studio-text-secondary">Updating character profiles...</p>
+                    </div>
+                  </div>
+                )}
                 {Object.entries(characterData.characters).map(([name, character]) => (
                   <CharacterCard key={name} name={name} character={character} />
                 ))}
@@ -708,13 +701,21 @@ const CharacterBreakdownTab: React.FC = () => {
             )}
             
             {activeSubtab === 1 && (
-              <div className="studio-section animate-fade-in">
+              <div className="studio-section animate-fade-in relative">
+                {isRegenerating && (
+                  <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                      <p className="text-sm text-studio-text-secondary">Updating character arcs & relationships...</p>
+                    </div>
+                  </div>
+                )}
                 <h3 className="text-xl font-medium mb-4">Character Arcs & Relationships</h3>
                 
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     {Object.entries(characterData.characters).map(([charName, char]) => {
-                      const emotionalJourney = (char as Character).emotional_range?.emotional_journey || [] as EmotionalJourneyEntry[];
+                      const emotionalJourney = (char as Character).emotional_range?.emotional_journey || [];
                       
                       return (
                         <div key={charName} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
@@ -722,7 +723,7 @@ const CharacterBreakdownTab: React.FC = () => {
                           
                           {emotionalJourney.length > 0 ? (
                             <div className="space-y-3">
-                              {emotionalJourney.map((journey: EmotionalJourneyEntry, i: number) => (
+                              {emotionalJourney.map((journey, i) => (
                                 <div key={i} className="bg-studio-blue/30 p-3 rounded">
                                   <div className="flex justify-between mb-1">
                                     <span className="text-studio-text-secondary">Scene {journey.scene}</span>
@@ -752,11 +753,8 @@ const CharacterBreakdownTab: React.FC = () => {
                   
                   <h4 className="text-lg font-medium mb-3">Character Relationships</h4>
                   <div className="space-y-4">
-                    {Object.entries(characterData.relationships).map(([relationKey, relation]) => {
-                      // Extract character names from the relationship key
+                    {Object.entries(characterData.relationships || {}).map(([relationKey, relation]) => {
                       const charNames = relationKey.split('-');
-                      const relationData = relation as Relationship;
-                      
                       return (
                         <div key={relationKey} className="bg-studio-blue/40 border border-studio-border p-4 rounded-lg">
                           <h5 className="font-medium mb-3">
@@ -767,15 +765,15 @@ const CharacterBreakdownTab: React.FC = () => {
                             <div>
                               <div className="text-sm text-studio-text-secondary mb-1">Relationship Type:</div>
                               <div className="text-sm bg-studio-blue/30 p-2 rounded">
-                                {relationData.type || 'Not specified'}
+                                {relation.type || 'Not specified'}
                               </div>
                             </div>
                             
                             <div>
                               <div className="text-sm text-studio-text-secondary mb-1">Dynamics:</div>
                               <div className="flex flex-wrap gap-1">
-                                {relationData.dynamics && relationData.dynamics.length > 0 ? (
-                                  relationData.dynamics.map((dynamic: string, i: number) => (
+                                {relation.dynamics && relation.dynamics.length > 0 ? (
+                                  relation.dynamics.map((dynamic, i) => (
                                     <span key={i} className="text-xs bg-studio-blue/20 px-2 py-1 rounded">
                                       {dynamic}
                                     </span>
@@ -784,36 +782,6 @@ const CharacterBreakdownTab: React.FC = () => {
                                   <span className="text-sm text-studio-text-secondary">No dynamics defined</span>
                                 )}
                               </div>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4">
-                            <div className="text-sm text-studio-text-secondary mb-1">Interactions:</div>
-                            <div className="bg-studio-blue/30 p-3 rounded">
-                              {relationData.interactions && relationData.interactions.length > 0 ? (
-                                <div className="space-y-2">
-                                  {relationData.interactions.map((interaction: string, i: number) => (
-                                    <div key={i} className="text-sm">{interaction}</div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-sm text-studio-text-secondary">No interactions recorded</div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4">
-                            <div className="text-sm text-studio-text-secondary mb-1">Conflicts:</div>
-                            <div className="bg-studio-blue/30 p-3 rounded">
-                              {relationData.conflicts && relationData.conflicts.length > 0 ? (
-                                <div className="space-y-2">
-                                  {relationData.conflicts.map((conflict: string, i: number) => (
-                                    <div key={i} className="text-sm">{conflict}</div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-sm text-studio-text-secondary">No conflicts recorded</div>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -825,7 +793,15 @@ const CharacterBreakdownTab: React.FC = () => {
             )}
             
             {activeSubtab === 2 && (
-              <div className="studio-section animate-fade-in">
+              <div className="studio-section animate-fade-in relative">
+                {isRegenerating && (
+                  <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                      <p className="text-sm text-studio-text-secondary">Updating scene matrix...</p>
+                    </div>
+                  </div>
+                )}
                 <h3 className="text-xl font-medium mb-4">Scene Matrix</h3>
                 
                 {characterData.scene_matrix && Object.keys(characterData.scene_matrix).length > 0 ? (
@@ -914,7 +890,15 @@ const CharacterBreakdownTab: React.FC = () => {
             )}
             
             {activeSubtab === 3 && (
-              <div className="studio-section animate-fade-in">
+              <div className="studio-section animate-fade-in relative">
+                {isRegenerating && (
+                  <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                      <p className="text-sm text-studio-text-secondary">Updating character statistics...</p>
+                    </div>
+                  </div>
+                )}
                 <h3 className="text-xl font-medium mb-4">Character Statistics</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">

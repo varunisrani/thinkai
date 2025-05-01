@@ -446,9 +446,36 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
   return (
     <div className="h-full flex flex-col p-6 overflow-y-auto min-h-screen">
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold mb-4 text-studio-text-primary">
-          Storyboard Generation
-        </h2>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-semibold mb-4 text-studio-text-primary">
+              Storyboard Generation
+            </h2>
+            <p className="text-sm text-studio-text-secondary">
+              Generate visual representations for each scene in your script.
+            </p>
+          </div>
+
+          {storyboardData && (
+            <button 
+              onClick={generateFullStoryboard}
+              disabled={loading}
+              className="flex items-center px-4 py-2 text-sm rounded-md bg-studio-accent hover:bg-studio-accent/90 disabled:bg-studio-accent/50 text-white transition-colors duration-200"
+            >
+              {loading ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate
+                </>
+              )}
+            </button>
+          )}
+        </div>
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -469,64 +496,9 @@ const StoryboardTab: React.FC<StoryboardTabProps> = ({ darkMode, apiUrl }) => {
             <h3 className="text-xl font-medium mb-4">
               Generate a complete storyboard for your script
             </h3>
-            <p className="text-studio-text-secondary mb-4">
-              The storyboard generator will create visual representations for each scene in your script.
-              You can customize the shot types, visual style, and other parameters below.
+            <p className="text-studio-text-secondary mb-6">
+              The storyboard generator will create visual representations for each scene in your script using our optimized default settings.
             </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <Label htmlFor="default-shot-type">Default Shot Type</Label>
-                <Select
-                  defaultValue={storyboardSettings.shot_settings.default_shot_type}
-                  onValueChange={(value) => setStoryboardSettings({
-                    ...storyboardSettings,
-                    shot_settings: {
-                      ...storyboardSettings.shot_settings,
-                      default_shot_type: value
-                    }
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select shot type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MS">Medium Shot (MS)</SelectItem>
-                    <SelectItem value="WS">Wide Shot (WS)</SelectItem>
-                    <SelectItem value="CU">Close-Up (CU)</SelectItem>
-                    <SelectItem value="ECU">Extreme Close-Up (ECU)</SelectItem>
-                    <SelectItem value="OTS">Over The Shoulder (OTS)</SelectItem>
-                    <SelectItem value="POV">Point of View (POV)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="visual-style">Visual Style</Label>
-                <Select
-                  defaultValue={storyboardSettings.shot_settings.style}
-                  onValueChange={(value) => setStoryboardSettings({
-                    ...storyboardSettings,
-                    shot_settings: {
-                      ...storyboardSettings.shot_settings,
-                      style: value
-                    }
-                  })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select visual style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="realistic">Realistic</SelectItem>
-                    <SelectItem value="scribble">Scribble/Sketch</SelectItem>
-                    <SelectItem value="noir">Film Noir</SelectItem>
-                    <SelectItem value="anime">Anime</SelectItem>
-                    <SelectItem value="watercolor">Watercolor</SelectItem>
-                    <SelectItem value="storyboard">Classic Storyboard</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
             <Button 
               variant="default"

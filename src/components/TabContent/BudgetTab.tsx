@@ -3,7 +3,7 @@ import {
   DollarSign, PieChart, ArrowDown, ArrowUp, 
   ChevronDown, ChevronUp, Download, Settings,
   RefreshCw, AlertCircle, Sliders, Users,
-  MapPin, Truck, Shield
+  MapPin, Truck, Shield, Loader2
 } from 'lucide-react';
 import { useScriptData } from '@/hooks/useScriptData';
 import { toast } from 'sonner';
@@ -165,6 +165,7 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
   
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['personnel']);
   const [loading, setLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [budgetQualityLevel, setBudgetQualityLevel] = useState('Medium');
   const [equipmentPreference, setEquipmentPreference] = useState('Standard');
@@ -173,6 +174,7 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
   const [activeTab, setActiveTab] = useState<BudgetTabSection>('summary');
   const [showSettings, setShowSettings] = useState(false);
   const [budgetResponse, setBudgetResponse] = useState<BudgetData | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   // Update budgetResponse when budgetData changes
   useEffect(() => {
@@ -248,17 +250,16 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
   
   const handleGenerateBudget = async () => {
     if (!scriptData || !characterData || !scheduleData) {
-      logDebug('Generate budget failed - Missing required data', {
-        hasScriptData: !!scriptData,
-        hasCharacterData: !!characterData,
-        hasScheduleData: !!scheduleData
-      });
+      logDebug('Generate budget failed - Missing required data');
       toast.error('Please complete all previous steps first');
       return;
     }
 
-    logDebug('Starting budget generation...');
+    const isRegeneration = !!budgetData;
     setLoading(true);
+    if (isRegeneration) {
+      setIsRegenerating(true);
+    }
     setError(null);
 
     try {
@@ -330,13 +331,34 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
         throw new Error(result.error || 'Unknown API error');
       }
 
-      // Make sure data is saved to localStorage properly
-      logDebug('Saving budget data to localStorage and context');
-      saveToStorage('BUDGET_DATA', result.data);
-      setBudgetResponse(result.data);
-      updateBudgetData(result.data);
-      toast.success('Budget generated successfully!');
+      // Force a re-render if regenerating
+      if (isRegeneration) {
+        // Temporarily clear the data to force a re-render
+        updateBudgetData(null);
+        setBudgetResponse(null);
+        
+        // Wait for a tick to ensure UI updates
+        await new Promise(resolve => setTimeout(resolve, 0));
+        
+        // Update storage and data
+        saveToStorage('BUDGET_DATA', result.data);
+        setBudgetResponse(result.data);
+        updateBudgetData(result.data);
+        
+        // Force component update
+        setForceUpdate(prev => prev + 1);
 
+        // Add a small delay before removing regeneration state
+        setTimeout(() => {
+          setIsRegenerating(false);
+        }, 500);
+      } else {
+        saveToStorage('BUDGET_DATA', result.data);
+        setBudgetResponse(result.data);
+        updateBudgetData(result.data);
+      }
+
+      toast.success(isRegeneration ? 'Budget regenerated successfully!' : 'Budget generated successfully!');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate budget';
       logDebug('Error during budget generation:', err);
@@ -357,7 +379,6 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
       }
     } finally {
       setLoading(false);
-      logDebug('Budget generation completed');
     }
   };
 
@@ -565,55 +586,158 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
     }
   });
 
+  const renderRegenerateButton = () => {
+    if (!budgetData) return null;
+
+    return (
+      <button 
+        onClick={handleGenerateBudget}
+        disabled={loading || isRegenerating}
+        className={cn(
+          "flex items-center px-4 py-2 text-sm rounded-md",
+          "bg-studio-accent hover:bg-studio-accent/90 disabled:bg-studio-accent/50",
+          "text-white transition-colors duration-200",
+          "focus:outline-none focus:ring-2 focus:ring-studio-accent focus:ring-offset-2",
+          "disabled:cursor-not-allowed"
+        )}
+      >
+        {loading || isRegenerating ? (
+          <div className="flex items-center">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <span>Regenerating...</span>
+          </div>
+        ) : (
+          <div className="flex items-center">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            <span>Regenerate Budget</span>
+          </div>
+        )}
+      </button>
+    );
+  };
+
+  const renderExportButton = () => {
+    const handleExport = () => {
+      if (!budgetData) return;
+      const jsonStr = JSON.stringify(budgetData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'budget_data.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    return (
+      <button 
+        onClick={handleExport}
+        className={cn(
+          "flex items-center px-4 py-2 text-sm rounded-md",
+          "bg-studio-blue/40 hover:bg-studio-blue/60",
+          "text-studio-text-secondary transition-colors duration-200",
+          "focus:outline-none focus:ring-2 focus:ring-studio-blue focus:ring-offset-2"
+        )}
+      >
+        <Download className="h-4 w-4 mr-2" />
+        Export
+      </button>
+    );
+  };
+
+  const renderLoadingOverlay = () => {
+    if (!isRegenerating) return null;
+
+    const getMessage = () => {
+      switch (activeTab) {
+        case 'summary':
+          return 'Updating budget summary...';
+        case 'locations':
+          return 'Updating location costs...';
+        case 'equipment':
+          return 'Updating equipment costs...';
+        case 'personnel':
+          return 'Updating personnel costs...';
+        case 'logistics':
+          return 'Updating logistics costs...';
+        case 'insurance':
+          return 'Updating insurance costs...';
+        default:
+          return 'Updating budget data...';
+      }
+    };
+
+    return (
+      <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+        <div className="text-center">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+          <p className="text-sm text-studio-text-secondary">{getMessage()}</p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 h-full overflow-y-auto animate-fade-in">
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-semibold text-studio-text-primary">
-            Production Budget
-          </h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-studio-text-primary">
+              Production Budget
+            </h2>
+            <p className="text-sm text-studio-text-secondary mt-1">
+              Plan and manage your production budget efficiently.
+            </p>
+          </div>
           
           <div className="flex items-center space-x-4">
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => setShowSettings(true)}
-                className="flex items-center px-3 py-1.5 rounded-md bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60"
-              >
-                <Settings className="h-4 w-4 mr-1" />
-                Settings
-              </button>
-              <button 
-                onClick={handleGenerateBudget}
-                disabled={loading}
-                className="flex items-center px-3 py-1.5 rounded-md bg-studio-accent text-white hover:bg-studio-accent-dark disabled:opacity-50"
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                {loading ? 'Regenerating...' : 'Regenerate'}
-              </button>
-              <button 
-                onClick={() => {
-                  const jsonStr = JSON.stringify(budgetData, null, 2);
-                  const blob = new Blob([jsonStr], { type: 'application/json' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'budget_data.json';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                }}
-                className="flex items-center px-3 py-1.5 rounded-md bg-studio-blue/40 text-studio-text-secondary hover:bg-studio-blue/60"
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Export
-              </button>
-            </div>
+            {(budgetData || budgetResponse) && (
+              <div className="flex space-x-2">
+                <button 
+                  onClick={handleGenerateBudget}
+                  disabled={loading || isRegenerating}
+                  className={cn(
+                    "flex items-center px-4 py-2 text-sm rounded-md",
+                    "bg-studio-accent hover:bg-studio-accent/90 disabled:bg-studio-accent/50",
+                    "text-white transition-colors duration-200",
+                    "focus:outline-none focus:ring-2 focus:ring-studio-accent focus:ring-offset-2",
+                    "disabled:cursor-not-allowed"
+                  )}
+                >
+                  {loading || isRegenerating ? (
+                    <div className="flex items-center">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <span>Regenerating...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      <span>Regenerate Budget</span>
+                    </div>
+                  )}
+                </button>
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className={cn(
+                    "flex items-center px-4 py-2 text-sm rounded-md",
+                    "bg-studio-blue/40 hover:bg-studio-blue/60",
+                    "text-studio-text-secondary transition-colors duration-200",
+                    "focus:outline-none focus:ring-2 focus:ring-studio-blue focus:ring-offset-2"
+                  )}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </button>
+                {renderExportButton()}
+              </div>
+            )}
           </div>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md" role="alert">
             {error}
           </div>
         )}
@@ -689,9 +813,19 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
         </div>
 
         {/* Tab Content */}
-        <div className="studio-section">
+        <div className="studio-section relative">
+          {renderLoadingOverlay()}
+
           {activeTab === 'summary' && (
-            <div className="space-y-6">
+            <div className="space-y-6 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating budget summary...</p>
+                  </div>
+                </div>
+              )}
               {/* Budget Overview */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-studio-blue/40 p-6 rounded-lg">
@@ -799,7 +933,15 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
           )}
 
           {activeTab === 'locations' && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating location costs...</p>
+                  </div>
+                </div>
+              )}
               {Object.entries(budgetResponse?.location_costs || {}).map(([location, data]) => (
                 <div key={location} className="bg-studio-blue/40 p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-3">
@@ -838,7 +980,15 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
           )}
 
           {activeTab === 'equipment' && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating equipment costs...</p>
+                  </div>
+                </div>
+              )}
               {Object.entries(budgetResponse?.equipment_costs || {}).map(([category, data]) => (
                 <div key={category} className="bg-studio-blue/40 p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-3">
@@ -884,7 +1034,15 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
           )}
 
           {activeTab === 'personnel' && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating personnel costs...</p>
+                  </div>
+                </div>
+              )}
               {Object.entries(getBudgetSectionData(budgetResponse.personnel_costs)).map(([role, data]) => (
                 <div key={role} className="bg-studio-blue/40 p-4 rounded-lg">
                   <div className="flex justify-between items-center mb-2">
@@ -915,7 +1073,15 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
           )}
 
           {activeTab === 'logistics' && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating logistics costs...</p>
+                  </div>
+                </div>
+              )}
               <div className="bg-studio-blue/40 p-4 rounded-lg">
                 <h4 className="font-medium mb-3">Transportation</h4>
                 <div className="flex justify-between text-sm text-studio-text-secondary">
@@ -951,7 +1117,15 @@ const BudgetTab: React.FC<BudgetTabProps> = ({ darkMode, apiUrl }) => {
           )}
 
           {activeTab === 'insurance' && (
-            <div className="space-y-4">
+            <div className="space-y-4 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating insurance costs...</p>
+                  </div>
+                </div>
+              )}
               <div className="bg-studio-blue/40 p-4 rounded-lg">
                 <div className="flex justify-between items-center">
                   <span>Insurance Coverage</span>

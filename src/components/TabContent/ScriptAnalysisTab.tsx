@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { History, FileSearch, BarChart2, Users, Database, Loader, AlertCircle } from 'lucide-react';
+import { History, FileSearch, BarChart2, Users, Database, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getScriptData } from '@/services/scriptApiService';
 import { useScriptData } from '@/hooks/useScriptData';
+import { toast } from 'sonner';
+
+// Add API endpoint constant
+const API_URL = 'https://varun324242-sjuu.hf.space/api';
+
+// Add storage keys
+const STORAGE_KEYS = {
+  SCRIPT_DATA: 'SCRIPT_DATA',
+  ONE_LINER_DATA: 'ONE_LINER_DATA',
+  CHARACTER_DATA: 'CHARACTER_DATA',
+  SCHEDULE_DATA: 'SCHEDULE_DATA',
+  BUDGET_DATA: 'BUDGET_DATA',
+  STORYBOARD_DATA: 'STORYBOARD_DATA',
+  THEME_MODE: 'THEME_MODE'
+};
 
 // Define better types for the ScriptData interface
 export interface ScriptData {
@@ -864,11 +879,20 @@ const ScriptAnalysisTab: React.FC = () => {
   const [activeSubtab, setActiveSubtab] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   
   // Use unknown type assertion to handle different ScriptData interfaces
   const context = useScriptData();
   const scriptData = context.scriptData as unknown as ScriptData | null;
   const updateScriptData = context.updateScriptData as (data: unknown) => void;
+
+  const components = {
+    0: () => <TimelineAnalysis scriptData={scriptData} />,
+    1: () => <SceneAnalysis scriptData={scriptData} />,
+    2: () => <TechnicalRequirements scriptData={scriptData} />,
+    3: () => <DepartmentAnalysis scriptData={scriptData} />
+  };
 
   const subtabs = [
     { icon: History, label: 'Timeline' },
@@ -876,6 +900,98 @@ const ScriptAnalysisTab: React.FC = () => {
     { icon: BarChart2, label: 'Technical Requirements' },
     { icon: Users, label: 'Department Analysis' }
   ];
+
+  // Add offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setIsOffline(!navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const regenerateAnalysis = async () => {
+    if (!scriptData) {
+      toast.error('No script data available. Please upload a script first.');
+      return;
+    }
+
+    try {
+      setIsRegenerating(true);
+      setError(null);
+      setIsLoading(true); // Set loading state to show loading UI
+
+      // Get the original script text or content from scriptData
+      const scriptContent = scriptData.parsed_data?.formatted_text || '';
+      
+      // Make the API call to re-analyze the script
+      const response = await fetch(`${API_URL}/script/text`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          script: scriptContent,
+          validation_level: 'lenient'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to regenerate analysis');
+      }
+
+      // Save to local storage
+      localStorage.setItem(STORAGE_KEYS.SCRIPT_DATA, JSON.stringify(result.data));
+      
+      // Update context with new analysis
+      updateScriptData(result.data);
+
+      // Reset states
+      setIsLoading(false);
+      setError(null);
+      
+      toast.success('Script analysis regenerated successfully!');
+
+      // Force a re-render of the current tab content
+      const currentTab = activeSubtab;
+      setActiveSubtab(-1); // Set to invalid tab to force re-render
+      setTimeout(() => {
+        setActiveSubtab(currentTab); // Set back to current tab
+      }, 0);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to regenerate analysis';
+      console.error('Error regenerating analysis:', error);
+      setError(errorMessage);
+      toast.error(errorMessage);
+
+      // Try to load from localStorage as fallback
+      try {
+        const storedData = localStorage.getItem(STORAGE_KEYS.SCRIPT_DATA);
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          updateScriptData(parsedData);
+          toast.success('Loaded previous analysis from local storage');
+        }
+      } catch (storageError) {
+        console.error('Failed to load from localStorage:', storageError);
+      }
+    } finally {
+      setIsRegenerating(false);
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const loadScriptData = async () => {
@@ -906,11 +1022,11 @@ const ScriptAnalysisTab: React.FC = () => {
   }, [scriptData, updateScriptData]);
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && !scriptData) {
       return <LoadingMessage />;
     }
 
-    if (error) {
+    if (error && !scriptData) {
       return <ErrorMessage message={error} />;
     }
 
@@ -918,12 +1034,20 @@ const ScriptAnalysisTab: React.FC = () => {
       return <NoDataMessage />;
     }
     
-    const components = {
-      0: () => <TimelineAnalysis scriptData={scriptData} />,
-      1: () => <SceneAnalysis scriptData={scriptData} />,
-      2: () => <TechnicalRequirements scriptData={scriptData} />,
-      3: () => <DepartmentAnalysis scriptData={scriptData} />
-    };
+    // Show loading overlay during regeneration
+    if (isRegenerating) {
+      return (
+        <div className="relative">
+          <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm flex items-center justify-center z-10">
+            <div className="text-center">
+              <Loader className="h-8 w-8 animate-spin mx-auto mb-4 text-studio-accent" />
+              <p className="text-studio-text-secondary">Regenerating analysis...</p>
+            </div>
+          </div>
+          {components[activeSubtab as keyof typeof components]?.()}
+        </div>
+      );
+    }
 
     return components[activeSubtab as keyof typeof components]?.();
   };
@@ -931,9 +1055,48 @@ const ScriptAnalysisTab: React.FC = () => {
   return (
     <div className="h-full flex flex-col">
       <div className="border-b border-studio-border p-4">
-        <h2 className="text-2xl font-semibold mb-4 text-studio-text-primary">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-studio-text-primary">
           Script Analysis
         </h2>
+            <p className="text-sm text-studio-text-secondary mt-1">
+              Analyze your script for technical requirements, scene breakdowns, and more.
+            </p>
+          </div>
+          
+          {/* Show offline warning */}
+          {isOffline && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-sm text-yellow-700 flex items-center mr-4">
+              <AlertCircle className="h-4 w-4 mr-2 text-yellow-500" />
+              Offline Mode
+            </div>
+          )}
+          
+          {scriptData && (
+            <button
+              onClick={regenerateAnalysis}
+              disabled={isRegenerating || isOffline}
+              className={cn(
+                "flex items-center px-4 py-2 text-sm rounded-md",
+                "bg-studio-accent hover:bg-studio-accent/90 disabled:bg-studio-accent/50",
+                "text-white disabled:text-white/70 transition-colors"
+              )}
+            >
+              {isRegenerating ? (
+                <>
+                  <Loader className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating Analysis...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate Analysis
+                </>
+              )}
+            </button>
+          )}
+        </div>
         
         <div className="flex overflow-x-auto pb-2">
           {subtabs.map((tab, index) => (

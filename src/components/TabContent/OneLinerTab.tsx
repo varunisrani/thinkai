@@ -23,6 +23,7 @@ const OneLinerTab: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Log initial mount
   useEffect(() => {
@@ -137,8 +138,12 @@ const OneLinerTab: React.FC = () => {
       scriptDataSize: JSON.stringify(scriptData).length
     });
 
+    const isRegeneration = !!oneLinerData;
     setIsLoading(true);
     setError(null);
+    if (isRegeneration) {
+      setIsRegenerating(true);
+    }
     
     try {
       logDebug('Making API request for one-liner analysis');
@@ -176,17 +181,45 @@ const OneLinerTab: React.FC = () => {
         logDebug('Successfully saved one-liner data to localStorage');
       } catch (storageError) {
         logDebug('Error saving to localStorage:', storageError);
-        // Don't throw here - we still want to update the UI even if storage fails
       }
       
-      toast.success('One-liner analysis completed successfully!');
+      // Clear any existing errors
+      setError(null);
+      
+      // Show success message
+      toast.success(isRegeneration ? 'One-liner analysis regenerated successfully!' : 'One-liner analysis completed successfully!');
+
+      // Force a re-render if regenerating
+      if (isRegeneration) {
+        // Temporarily clear the data to force a re-render
+        updateOneLinerData(null);
+        setTimeout(() => {
+          updateOneLinerData(result.data);
+        }, 0);
+      }
+
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to generate one-liner analysis';
       logDebug('Error in generation:', error);
       toast.error(errorMsg);
       setError(errorMsg);
+
+      // Try to load from localStorage as fallback if regenerating
+      if (isRegeneration) {
+        try {
+          const storedData = localStorage.getItem('ONE_LINER_DATA');
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            updateOneLinerData(parsedData);
+            toast.success('Restored previous one-liner analysis');
+          }
+        } catch (storageError) {
+          logDebug('Error loading from localStorage:', storageError);
+        }
+      }
     } finally {
       setIsLoading(false);
+      setIsRegenerating(false);
       logDebug('Generation attempt completed');
     }
   };
@@ -260,12 +293,17 @@ const OneLinerTab: React.FC = () => {
     <div className="p-6 h-full overflow-y-auto animate-fade-in">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
+          <div>
           <h2 className="text-2xl font-semibold text-studio-text-primary">
             Script One-Liners
           </h2>
+            <p className="text-sm text-studio-text-secondary mt-1">
+              Generate concise one-line descriptions for each scene in your script.
+            </p>
+          </div>
           
           <div className="flex space-x-2">
-            {!oneLinerData && (
+            {!oneLinerData ? (
               <button 
                 onClick={handleGenerateOneLiner}
                 disabled={isLoading || !scriptData}
@@ -283,9 +321,26 @@ const OneLinerTab: React.FC = () => {
                   </>
                 )}
               </button>
-            )}
-            
-            {oneLinerData && (
+            ) : (
+              <div className="flex space-x-2">
+                <button 
+                  onClick={handleGenerateOneLiner}
+                  disabled={isLoading}
+                  className="flex items-center px-4 py-2 rounded-md bg-studio-accent hover:bg-studio-accent-hover disabled:bg-studio-accent/50 text-white"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Regenerating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Regenerate
+                    </>
+                  )}
+                </button>
+                
               <button 
                 onClick={handleExport}
                 className="flex items-center px-4 py-2 rounded-md bg-studio-blue hover:bg-studio-blue/70 text-studio-text-secondary"
@@ -293,6 +348,7 @@ const OneLinerTab: React.FC = () => {
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </button>
+              </div>
             )}
           </div>
         </div>
@@ -322,8 +378,35 @@ const OneLinerTab: React.FC = () => {
         ) : (
           <div className="space-y-6">
             {/* Overall Summary */}
-            <div className="bg-studio-blue/40 border border-studio-border rounded-lg p-6">
-              <h3 className="text-lg font-medium mb-3">Overall Summary</h3>
+            <div className="bg-studio-blue/40 border border-studio-border rounded-lg p-6 relative">
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                  <div className="text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                    <p className="text-sm text-studio-text-secondary">Updating summary...</p>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-between items-start mb-3">
+                <h3 className="text-lg font-medium">Overall Summary</h3>
+                <button
+                  onClick={handleGenerateOneLiner}
+                  disabled={isLoading}
+                  className="text-sm text-studio-accent hover:text-studio-accent-hover disabled:text-studio-accent/50 flex items-center"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Regenerating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-3 w-3 mr-1" />
+                      Regenerate
+                    </>
+                  )}
+                </button>
+              </div>
               <p className="text-studio-text-secondary">
                 {oneLinerData.overall_summary}
               </p>
@@ -332,6 +415,15 @@ const OneLinerTab: React.FC = () => {
             {/* Scene One-Liners */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Scene Breakdowns</h3>
+              <div className="space-y-4 relative">
+                {isRegenerating && (
+                  <div className="absolute inset-0 bg-studio-blue/10 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-studio-accent" />
+                      <p className="text-sm text-studio-text-secondary">Updating scene breakdowns...</p>
+                    </div>
+                  </div>
+                )}
               {oneLinerData.scenes.map((scene) => (
                 <div 
                   key={scene.scene_number}
@@ -343,6 +435,7 @@ const OneLinerTab: React.FC = () => {
                   <p className="text-studio-text-secondary mb-2">{scene.one_liner}</p>
                 </div>
               ))}
+              </div>
             </div>
           </div>
         )}
