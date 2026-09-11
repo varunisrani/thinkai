@@ -1,73 +1,60 @@
-# Welcome to your Lovable project
+# ThinkAI Script-to-Screen Dashboard
 
-## Project info
+ThinkAI is a film-preproduction front end that guides a script through analysis, summaries, character breakdowns, scheduling, budgeting, storyboards, and an overview.
 
-**URL**: https://lovable.dev/projects/3ad09d33-a04d-465d-937b-3e028ecc77ad
+## Core features
 
-## How can I edit this code?
+- Upload or paste a script and submit it to a remote processing API.
+- Step-gated workflow for script analysis, scene one-liners, characters, schedules, budgets, and storyboards.
+- Local browser storage for intermediate results and recovery when some API calls fail.
+- Tabular and visual presentation of production data.
+- Included sample JSON data for scripts, characters, schedules, and budgets.
 
-There are several ways of editing your application.
+## Technology stack
 
-**Use Lovable**
+- React 18, TypeScript, and Vite 5
+- React Router and TanStack React Query
+- Tailwind CSS and shadcn/ui (Radix UI)
+- Recharts, Lucide icons, and browser `localStorage`
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3ad09d33-a04d-465d-937b-3e028ecc77ad) and start prompting.
+## Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 20 or newer
+- npm (a `package-lock.json` is included)
+- Network access to the API endpoint currently compiled into the client
 
-**Use your preferred IDE**
+## Local setup
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+git clone https://github.com/varunisrani/thinkai.git
+cd thinkai
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Other verified scripts are:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run build
+npm run preview
+npm run lint
+```
 
-**Use GitHub Codespaces**
+## Configuration
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The current source does not read environment variables. API base URLs are hard-coded in the service modules rather than configured at build or run time.
 
-## What technologies are used for this project?
+## Project structure
 
-This project is built with:
+```text
+src/pages/                  Main workflow and fallback page
+src/components/TabContent/ Workflow stages
+src/contexts/               Shared script-workflow state
+src/services/               Remote API and browser-storage adapters
+src/types/                  Script-domain types
+*.json                      Sample production data
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Status and limitations
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/3ad09d33-a04d-465d-937b-3e028ecc77ad) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This repository contains only the browser client; it does not include the remote processing service. Most processing features therefore depend on external API availability and compatibility. Intermediate script and production data may be stored unencrypted in the browser's local storage. The source contains two service modules with different hard-coded API bases, so not every call path is guaranteed to target the same backend.
